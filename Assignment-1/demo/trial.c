@@ -28,9 +28,8 @@ void loader_cleanup() {
  */
 void load_and_run_elf(char** exe) {
 }
-
-int main()//int argc, char** argv) 
-{
+    
+int main(){    
     fd = open("fib2", O_RDONLY);
     off_t fileSize = lseek(fd, 0, SEEK_END);
     void *content = malloc(fileSize);
@@ -41,28 +40,41 @@ int main()//int argc, char** argv)
     unsigned char *fileData = (unsigned char *)content;
     memcpy(ehdr,fileData,sizeof(Elf32_Ehdr));
     // printf("%04X\n", ehdr->e_ident[0]);
-
+    printf("fileData: %p\n", (void *)fileData);
     off_t phOffset = ehdr->e_phoff;
     size_t phEntrySize = ehdr->e_phentsize;
     size_t numPhEntries = ehdr->e_phnum;
     phdr = (Elf32_Phdr *)malloc(phEntrySize*numPhEntries);
     ssize_t ph_read = pread(fd, phdr, phEntrySize*numPhEntries, phOffset);
     // for (size_t i = 0; i < 2; ++i) {
-    //     printf("p_type=%08X, p_vaddr=%08X\n", phdr[i].p_type , phdr[i].p_mem);
-    // }
-    void* virtual_mem;
-    virtual_mem=mmap(NULL,phdr[1].p_memsz,PROT_READ|PROT_WRITE|PROT_EXEC,MAP_ANONYMOUS|MAP_PRIVATE, 0,0);
+    //     printf("p_type=%08X, p_vaddr=%08X\n", phdr[i].p_type , phdr[i].p_memsz);
+    // // }
 
-    void *source_addr = (void *)((uintptr_t)fileData + phdr[1].p_offset);
-    void *destination_addr = virtual_mem;
-    size_t segment_size = phdr[1].p_filesz;
-    memcpy(destination_addr, source_addr, segment_size);
+    size_t i;
+    for (i = 0; i < numPhEntries; ++i) {
+        if (phdr[i].p_type == PT_LOAD && ehdr->e_entry >= phdr[i].p_vaddr && ehdr->e_entry < phdr[i].p_vaddr + phdr[i].p_memsz) {
+            if(phdr[i].p_type!=PT_NULL){
+                break;
+            }
+        }
+    }
+    printf("p_type=%08X, p_vaddr=%08X\n",phdr[i].p_type,phdr[i].p_vaddr);
 
-    off_t entry_offset = ehdr->e_entry - phdr[1].p_vaddr;
+    void* source_addr = (void*)((uintptr_t)fileData + phdr[i].p_offset);
+    printf("source address: %p\n", (void *)source_addr);
+    void *virtual_mem;
+    virtual_mem=mmap(NULL,phdr[i].p_memsz,PROT_READ|PROT_WRITE|PROT_EXEC,MAP_ANONYMOUS|MAP_PRIVATE,0,0);
+    memcpy(virtual_mem, source_addr, phdr[i].p_filesz);
+
+    off_t entry_offset = ehdr->e_entry - phdr[i].p_vaddr;
     void *entry_addr = (void *)((uintptr_t)virtual_mem + entry_offset);
+
+    printf("Calculated entry address: %p\n", (void *)entry_addr);
+
     typedef int (*StartFunction)(void);
-    StartFunction _start=(StartFunction)entry_addr;
+    StartFunction _start = (StartFunction)entry_addr;
     int result = _start();
-    printf("User _start return value = %d\n",result);
-    return 0;
-}
+    printf("User _start return value = %d\n", result);
+
+    // munmap(virtual_mem, phdr[i].p_memsz);
+}   
