@@ -1,4 +1,4 @@
-#include "/home/samyak/upload/starter/with-bonus/loader/loader.h"
+#include "/home/user/upload/starter/with-bonus/loader/loader.h"
 
 Elf32_Ehdr *ehdr;
 Elf32_Phdr *phdr;
