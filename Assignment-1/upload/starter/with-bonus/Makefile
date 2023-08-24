@@ -5,3 +5,4 @@ all:
 	make -C test
 	make -C loader
 	make -C launcher
+	make -C bin
