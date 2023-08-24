@@ -1,5 +1,4 @@
 #Create lib_simpleloader.so from loader.c
 all: 
-	gcc -m32 -shared -o lib_simpleloader.so -fPIC loader.c 
-	gcc -m32 -o loader loader.c
+	gcc -c -m32 -fPIC -shared -o ../bin/lib_simpleloader.so loader.c 
 #Provide the command for cleanup
