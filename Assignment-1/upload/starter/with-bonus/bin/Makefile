@@ -1,0 +1,2 @@
+all: 
+	./launch fib
