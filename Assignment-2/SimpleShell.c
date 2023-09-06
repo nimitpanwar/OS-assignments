@@ -7,6 +7,9 @@
 #include <sys/wait.h>  
 #include <string.h>
 
+//History and exit on clicking ctrl+c not yet implemented.
+
+
 void read_user_input(char* input,int size, char*command, char** arguments){
     fgets(input,size,stdin);
 
