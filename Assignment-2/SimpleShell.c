@@ -75,8 +75,7 @@ void shell_Loop(){
             printf("Terminated\n");
             return;
         }
-        // launch(command,arguments);
-        // printf("%d",status);
+        launch(command,arguments);
     } 
 }
 
