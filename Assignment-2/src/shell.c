@@ -8,7 +8,7 @@
 #include <string.h>
 #include <time.h>
 
-// pipes & bonus is left
+// pipes & bonus are left
 
 
 struct cmnd_Elt {
