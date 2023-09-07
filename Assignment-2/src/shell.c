@@ -10,14 +10,13 @@
 //History not yet implemented.
 
 
-struct CommandHistory {
+struct cmnd_Elt {
     char command[1024];
-    pid_t pid;
-    time_t start_time;
+    char* arguments[1024];
     double execution_time;
 };
 
-struct CommandHistory history[100];
+struct cmnd_Elt cmnd_Array[100];
 
 int history_count = 0;
 
@@ -45,18 +44,20 @@ void read_user_input(char* input,int size, char*command, char** arguments){
     strcpy(command, temp);
 
     if (history_count < 100) {
-            strcpy(history[history_count].command, input);
-            history_count++;
+            strcpy(cmnd_Array[history_count].command, input);
     }
+
     int i = 0;
     while (temp != NULL) {
+        if (history_count < 100) {      
+            cmnd_Array[history_count].arguments[i] = strdup(temp);
+        }      
         arguments[i] = temp;
         temp = strtok(NULL, " \n");
         i++;
     }
     arguments[i] = NULL;
-
-    // printf("%s\n",command);
+    history_count++;
 }
 
 int create_process_and_run(char* command, char** arguments) {
@@ -113,9 +114,15 @@ void shell_Loop() {
         printf("SimpleShell> ");
         fflush(stdout);
         read_user_input(input, sizeof(input), command, arguments);
-        if(strcmp(command,"history")==0){
+        if(strcmp(command,"History")==0){
             for (int i = 0; i < history_count; i++) {
-                printf("%d: %s\n", i + 1, history[i].command);
+                printf("%d: %s ", i + 1, cmnd_Array[i].command);
+                int j=1;
+                while(cmnd_Array[i].arguments[j]!=NULL){
+                    printf("%s ",cmnd_Array[i].arguments[j]);
+                    j++;
+                }
+                printf("\n");
             }
         }
         else if (strcmp(command, "cd") == 0) {
