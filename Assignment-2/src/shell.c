@@ -9,11 +9,22 @@
 
 //History not yet implemented.
 
-volatile sig_atomic_t ctrl_c_pressed = 0;
+// volatile sig_atomic_t ctrl_c_pressed = 0;
 
-void handle_ctrl_c(int signum) {
-    ctrl_c_pressed = 1;
+
+static void my_handler(int signum) {
+    static int counter = 0;
+    if(signum == SIGINT) {
+        char buff1[23] = "\nCaught SIGINT signal\n";
+        write(STDOUT_FILENO, buff1, 23);
+        if(counter==0) {
+            char buff2[20] = "Cannot handle more\n";
+            write(STDOUT_FILENO, buff2, 20);
+            exit(10);
+        }
+    } 
 }
+
 
 void read_user_input(char* input,int size, char*command, char** arguments){
     fgets(input,size,stdin);
@@ -71,16 +82,16 @@ void shell_Loop() {
     char input[1024];
     char command[1024];
     char* arguments[1024];
-    signal(SIGINT, handle_ctrl_c);
+    // signal(SIGINT, my_handler);
+    struct sigaction sig;
+    memset(&sig, 0, sizeof(sig));
+    sig.sa_handler = my_handler;
+    sigaction(SIGINT, &sig, NULL);
     
     do {
         printf("SimpleShell> ");
         fflush(stdout);
         read_user_input(input, sizeof(input), command, arguments);
-        if (strcmp(command, "exit") == 0) {
-            printf("Terminated\n");
-            break;
-        }
         launch(command, arguments);
     } while (1);
 }
