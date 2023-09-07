@@ -6,66 +6,63 @@
 #include <sys/types.h>    
 #include <sys/wait.h>  
 #include <string.h>
+#include <time.h>
 
-//exit and bonus are left
+//bonus is left
 
 
 struct cmnd_Elt {
     char command[1024];
-    char* arguments[1024];
-    // pid_t pid;
-    // time_t start_time;
+    int pid;
+    time_t start_time;
     double execution_time;
 };
 
 struct cmnd_Elt cmnd_Array[100];
 
-int history_count = 0;
+int cmnd_count = 0;
 
+int ctrl_clicked=0;
 
 
 static void my_handler(int signum) {
-    static int counter = 0;
     if(signum == SIGINT) {
-        char buff1[23] = "\nCaught SIGINT signal\n";
-        write(STDOUT_FILENO, buff1, 23);
-        if(counter==0) {
-            char buff2[20] = "Cannot handle more\n";
-            write(STDOUT_FILENO, buff2, 20);
-            exit(10);
-        }
+        ctrl_clicked=1;
     } 
 }
 
 
-void read_user_input(char* input,int size, char*command, char** arguments){
+
+int read_user_input(char* input,int size, char*command, char** arguments){
     fgets(input,size,stdin);
+    if(ctrl_clicked){
+        return 5;
+    }
+    if (cmnd_count < 100) {
+            strcpy(cmnd_Array[cmnd_count].command, input);
+            cmnd_count++;
+    }
 
     input[strcspn(input, "\n")] = '\0';
     char * temp= strtok(input," \n");
     strcpy(command, temp);
 
-    if (history_count < 100) {
-            strcpy(cmnd_Array[history_count].command, input);
-    }
-
+    
     int i = 0;
-    while (temp != NULL) {
-        if (history_count < 100) {      
-            cmnd_Array[history_count].arguments[i] = strdup(temp);
-        }      
+    while (temp != NULL) { 
         arguments[i] = temp;
         temp = strtok(NULL, " \n");
         i++;
     }
     arguments[i] = NULL;
-    history_count++;
+    return 0;
 }
 
 int create_process_and_run(char* command, char** arguments) {
+    // time(&(cmnd_Array[cmnd_count - 1].start_time));
     int child_PID = fork();
     if(child_PID < 0) {
-        printf("Something bad happened.\n");
+        printf("Something went wrong.\n");
         exit(10);
     } 
     else if(child_PID == 0) {
@@ -75,13 +72,22 @@ int create_process_and_run(char* command, char** arguments) {
             perror("execvp");
             exit(10);
         }
+        // time(&(cmnd_Array[cmnd_count - 1].start_time));
         printf("I should never get printed.\n");
     } 
     else {
         int ret;
+        // time(&(cmnd_Array[cmnd_count - 1].start_time));
+        time_t startTime;
+        time(&startTime);
         waitpid(child_PID, &ret, 0);
+        time_t endTime;
+        time(&endTime);
         if(WIFEXITED(ret)) {
+            cmnd_Array[cmnd_count - 1].execution_time=difftime(endTime,startTime);
+            cmnd_Array[cmnd_count - 1].pid=child_PID;
             printf("%d Exit =%d\n",child_PID,WEXITSTATUS(ret));
+
         } 
         else {
             printf("Abnormal termination of %d\n",child_PID);
@@ -104,14 +110,19 @@ void cd_Func(char *path) {
 
 
 void print_History(){
-    for (int i = 0; i < history_count; i++) {
-        printf("%d- %s ", i + 1, cmnd_Array[i].command);
+    for (int i = 0; i < cmnd_count; i++) {
+        printf("%d- %s \n", i + 1, cmnd_Array[i].command);
         int j=1;
-        while(cmnd_Array[i].arguments[j]!=NULL){
-            printf("%s ",cmnd_Array[i].arguments[j]);
-            j++;
-        }
-        printf("\n");
+    }
+}
+
+void print_On_Exit(){
+    printf("\nNo. : Command    PID    Start Time   Execution Time\n");
+    for (int i = 0; i < cmnd_count; i++) {
+        printf("%d : %s    %d    %s    %.2lf seconds\n",i+1, 
+        cmnd_Array[i].command, cmnd_Array[i].pid,
+        asctime(localtime(&cmnd_Array[i].start_time)),
+        cmnd_Array[i].execution_time);
     }
 }
 
@@ -122,10 +133,14 @@ void shell_Loop() {
     char* arguments[1024];
     // signal(SIGINT, my_handler);
     do {
-        printf("SimpleShell> ");
+        printf("(SimpleShell) ");
         fflush(stdout);
-        read_user_input(input, sizeof(input), command, arguments);
-        if(strcmp(command,"History")==0){
+        int sig_recieved= read_user_input(input, sizeof(input), command, arguments);
+        if(sig_recieved){
+            print_On_Exit();
+            return;
+        }
+        if(strcmp(command,"history")==0){
             print_History();
         }
         else if (strcmp(command, "cd") == 0) {
@@ -148,5 +163,6 @@ int main(){
     sigaction(SIGINT, &sig, NULL);
 
     shell_Loop();
+
     return 0;
 }
