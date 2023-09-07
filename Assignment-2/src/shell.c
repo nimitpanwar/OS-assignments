@@ -7,8 +7,7 @@
 #include <sys/wait.h>  
 #include <string.h>
 
-//History not yet implemented.
-
+//exit and bonus are left
 
 struct cmnd_Elt {
     char command[1024];
