@@ -9,9 +9,12 @@
 
 //exit and bonus are left
 
+
 struct cmnd_Elt {
     char command[1024];
     char* arguments[1024];
+    // pid_t pid;
+    // time_t start_time;
     double execution_time;
 };
 
@@ -100,29 +103,30 @@ void cd_Func(char *path) {
 }
 
 
+void print_History(){
+    for (int i = 0; i < history_count; i++) {
+        printf("%d- %s ", i + 1, cmnd_Array[i].command);
+        int j=1;
+        while(cmnd_Array[i].arguments[j]!=NULL){
+            printf("%s ",cmnd_Array[i].arguments[j]);
+            j++;
+        }
+        printf("\n");
+    }
+}
+
+
 void shell_Loop() {
     char input[1024];
     char command[1024];
     char* arguments[1024];
     // signal(SIGINT, my_handler);
-    struct sigaction sig;
-    memset(&sig, 0, sizeof(sig));
-    sig.sa_handler = my_handler;
-    sigaction(SIGINT, &sig, NULL);
     do {
         printf("SimpleShell> ");
         fflush(stdout);
         read_user_input(input, sizeof(input), command, arguments);
         if(strcmp(command,"History")==0){
-            for (int i = 0; i < history_count; i++) {
-                printf("%d: %s ", i + 1, cmnd_Array[i].command);
-                int j=1;
-                while(cmnd_Array[i].arguments[j]!=NULL){
-                    printf("%s ",cmnd_Array[i].arguments[j]);
-                    j++;
-                }
-                printf("\n");
-            }
+            print_History();
         }
         else if (strcmp(command, "cd") == 0) {
             if (arguments[1] != NULL) {
@@ -138,6 +142,11 @@ void shell_Loop() {
 
 
 int main(){
+    struct sigaction sig;
+    memset(&sig, 0, sizeof(sig));
+    sig.sa_handler = my_handler;
+    sigaction(SIGINT, &sig, NULL);
+
     shell_Loop();
     return 0;
 }
