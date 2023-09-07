@@ -9,7 +9,18 @@
 
 //History not yet implemented.
 
-// volatile sig_atomic_t ctrl_c_pressed = 0;
+
+struct CommandHistory {
+    char command[1024];
+    pid_t pid;
+    time_t start_time;
+    double execution_time;
+};
+
+struct CommandHistory history[100];
+
+int history_count = 0;
+
 
 
 static void my_handler(int signum) {
@@ -33,6 +44,10 @@ void read_user_input(char* input,int size, char*command, char** arguments){
     char * temp= strtok(input," \n");
     strcpy(command, temp);
 
+    if (history_count < 100) {
+            strcpy(history[history_count].command, input);
+            history_count++;
+    }
     int i = 0;
     while (temp != NULL) {
         arguments[i] = temp;
@@ -41,7 +56,7 @@ void read_user_input(char* input,int size, char*command, char** arguments){
     }
     arguments[i] = NULL;
 
-    printf("%s\n",command);
+    // printf("%s\n",command);
 }
 
 int create_process_and_run(char* command, char** arguments) {
@@ -78,6 +93,13 @@ int launch (char* command, char** arguments) {
     return status;
 }
 
+void cd_Func(char *path) {
+    if (chdir(path) != 0) {
+        perror("cd");
+    }
+}
+
+
 void shell_Loop() {
     char input[1024];
     char command[1024];
@@ -87,14 +109,27 @@ void shell_Loop() {
     memset(&sig, 0, sizeof(sig));
     sig.sa_handler = my_handler;
     sigaction(SIGINT, &sig, NULL);
-    
     do {
         printf("SimpleShell> ");
         fflush(stdout);
         read_user_input(input, sizeof(input), command, arguments);
-        launch(command, arguments);
-    } while (1);
+        if(strcmp(command,"history")==0){
+            for (int i = 0; i < history_count; i++) {
+                printf("%d: %s\n", i + 1, history[i].command);
+            }
+        }
+        else if (strcmp(command, "cd") == 0) {
+            if (arguments[1] != NULL) {
+                cd_Func(arguments[1]);
+            } 
+        }
+        else{
+            launch(command, arguments);
+        }
+    } 
+    while (1);
 }
+
 
 int main(){
     shell_Loop();
