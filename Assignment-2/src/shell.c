@@ -46,22 +46,14 @@ void background_process_creation(char* command, char** arguments){
         exit(10);
     } 
     else if(child_PID == 0) {
-        int grandchild_PID=fork();
-        if(grandchild_PID<0) {
-            perror("fork");
-        }
-        else if (grandchild_PID == 0) {
-            if (execvp(command, arguments) == -1) {
-                perror("execvp");
-                exit(10);
-            }
-        } 
-        else {
-            _exit(0);
+        if (execvp(command, arguments) == -1) {
+            perror("execvp");
+            exit(10);
         }
     } 
     else {
         printf("%d\n",child_PID);
+
     }
 }
 
@@ -76,7 +68,11 @@ int read_user_input(char* input,int size, char*command, char** arguments){
             cmnd_count++;
     }
 
-    if(strstr(input,"|")){
+    if(strstr(input,"|") && strstr(input,"&") ){
+        remove_and(input);
+        return 4;
+    }
+    else if(strstr(input,"|")){
         return 2;
     }
     else if(strstr(input,"&")){
@@ -272,6 +268,7 @@ void execute_piped_commands(char** input_List, int num_Commands) {
     }
 
     time_t startTime;
+    time(&cmnd_Array[cmnd_count-1].start_time);
     time(&startTime);
     for (int i = 0; i < num_Commands; i++) {
         int status;
@@ -366,6 +363,90 @@ void execute_shell_script(const char* scriptFileName) {
 }
 
 
+void background_with_piped_creation(char* piped_Input){
+    char* input_List[1024];
+    int num_Commands=0;
+    piped_Input[strcspn(piped_Input, "\n")] = '\0';
+
+    char* tok=strtok(piped_Input,"|");
+    while (tok != NULL) { 
+        input_List[num_Commands] = tok;
+        tok= strtok(NULL, "|");
+        num_Commands++;
+    }
+
+    for(int i=0;i<num_Commands;i++){
+        remove_Spaces(input_List[i]);
+    }
+
+    
+    int fd[num_Commands - 1][2];
+    int pids[num_Commands];
+
+    for (int i = 0; i < num_Commands - 1; i++) {
+        if (pipe(fd[i]) == -1) {
+            perror("pipe");
+            return;
+        }
+    }
+
+    for (int i = 0; i < num_Commands; i++) {
+        char input[1024];
+        char command[1024];
+        char* arguments[1024];
+        strcpy(input, input_List[i]);
+        read_input_piped(input, command, arguments);
+        pids[i] = fork();
+        if (pids[i] < 0) {
+            perror("fork");
+            return;
+        }
+        if (pids[i] == 0) {
+            if (i == 0) {
+                dup2(fd[i][1], STDOUT_FILENO);
+                for (int j = 0; j < num_Commands - 1; j++) {
+                    close(fd[j][0]);
+                    close(fd[j][1]);
+                }
+                if (execvp(command, arguments) == -1) {
+                    perror("execvp");
+                    return;
+                }
+            } else if (i == num_Commands - 1) {
+                dup2(fd[i - 1][0], STDIN_FILENO);
+                for (int j = 0; j < num_Commands - 1; j++) {
+                    close(fd[j][0]);
+                    close(fd[j][1]);
+                }
+                if (execvp(command, arguments) == -1) {
+                    perror("execvp");
+                    return;
+                }
+            } else {
+                dup2(fd[i - 1][0], STDIN_FILENO);
+                dup2(fd[i][1], STDOUT_FILENO);
+                for (int j = 0; j < num_Commands - 1; j++) {
+                    close(fd[j][0]);
+                    close(fd[j][1]);
+                }
+                if (execvp(command, arguments) == -1) {
+                    perror("execvp");
+                    return;
+                }
+            }
+        }
+    }
+    time(&cmnd_Array[cmnd_count-1].start_time);
+    for (int j = 0; j < num_Commands - 1; j++) {
+        close(fd[j][0]);
+        close(fd[j][1]);
+    }
+
+
+    return;
+
+}
+
 void shell_Loop() {
     char input[1000];
     char command[1000];
@@ -378,7 +459,10 @@ void shell_Loop() {
             print_On_Exit();
             return;
         }
-        if(sig_recieved==2){
+        if(sig_recieved==4){
+            background_with_piped_creation(input);
+        }
+        else if(sig_recieved==2){
             process_piped_commands(input);
         }
         else if(sig_recieved==3){
