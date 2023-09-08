@@ -168,10 +168,6 @@ void shell_Loop() {
                 executeShellScript(arguments[1]);
             } else {
                 printf("Usage: rs <script_filename>\n");
-            }
-        } else if (strcmp(command, "rs") == 0) {
-            if (arguments[1] != NULL) {
-                executeShellScript(arguments[1]);
             } else {
                 printf("Usage: rs <script_filename>\n");
             }
