@@ -168,8 +168,6 @@ void shell_Loop() {
                 executeShellScript(arguments[1]);
             } else {
                 printf("Usage: rs <script_filename>\n");
-            } else {
-                printf("Usage: rs <script_filename>\n");
             }
         } else {
             launch(command, arguments);
