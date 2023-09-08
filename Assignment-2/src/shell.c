@@ -42,25 +42,19 @@ void background_process_creation(char* command, char** arguments){
     time(&(cmnd_Array[cmnd_count - 1].start_time));
     int child_PID = fork();
     if(child_PID < 0) {
-        printf("Something went wrong.\n");
+        perror("fork");
         exit(10);
     } 
     else if(child_PID == 0) {
-        // printf("I am the child process.\n");
-        // char* args[3] = {command,arguments[1],NULL};
         if (execvp(command, arguments) == -1) {
             perror("execvp");
             exit(10);
         }
-        // time(&(cmnd_Array[cmnd_count - 1].start_time));
-        // printf("I should never get printed.\n");
     } 
     else {
         printf("%d\n",child_PID);
-        // int ret;
 
     }
-    // return 0;
 }
 
 
@@ -110,21 +104,16 @@ int read_user_input(char* input,int size, char*command, char** arguments){
 }
 
 int create_process_and_run(char* command, char** arguments) {
-    // time(&(cmnd_Array[cmnd_count - 1].start_time));
     int child_PID = fork();
     if(child_PID < 0) {
-        printf("Something went wrong.\n");
+        perror("fork");
         exit(10);
     } 
     else if(child_PID == 0) {
-        // printf("I am the child process.\n");
-        // char* args[3] = {command,arguments[1],NULL};
         if (execvp(command, arguments) == -1) {
-            perror("execvp");
+            perror("execvp error");
             exit(10);
         }
-        // time(&(cmnd_Array[cmnd_count - 1].start_time));
-        // printf("I should never get printed.\n");
     } 
     else {
         int ret;
@@ -137,7 +126,6 @@ int create_process_and_run(char* command, char** arguments) {
         if(WIFEXITED(ret)) {
             cmnd_Array[cmnd_count - 1].execution_time=difftime(endTime,startTime);
             cmnd_Array[cmnd_count - 1].pid=child_PID;
-            // printf("%d Exit =%d\n",child_PID,WEXITSTATUS(ret));
 
         } 
         else {
@@ -209,78 +197,90 @@ int read_input_piped(char* input,char*command, char** arguments){
     return 0;
 }
 
-void execute_piped_commands(char** input_List, int num_Commands){
 
-    int fd[num_Commands-1][2];
+
+void execute_piped_commands(char** input_List, int num_Commands) {
+
+    int fd[num_Commands - 1][2];
     int pids[num_Commands];
 
-    for(int i=0;i<num_Commands-1;i++){
-        if(pipe(fd[i])==-1){
+    for (int i = 0; i < num_Commands - 1; i++) {
+        if (pipe(fd[i]) == -1) {
+            perror("pipe");
             return;
         }
     }
 
-    for(int i=0;i<num_Commands;i++){
+    for (int i = 0; i < num_Commands; i++) {
         char input[1024];
         char command[1024];
         char* arguments[1024];
-        strcpy(input,input_List[i]);
-        read_input_piped(input,command,arguments);
+        strcpy(input, input_List[i]);
+        read_input_piped(input, command, arguments);
         pids[i] = fork();
         if (pids[i] < 0) {
-            printf("error");
+            perror("fork");
             return;
         }
-        if(pids[i]==0){
-            if(i==0){
-                dup2(fd[i][1],STDOUT_FILENO);
-                for(int j=0;j<num_Commands-1;j++){
+        if (pids[i] == 0) {
+            if (i == 0) {
+                dup2(fd[i][1], STDOUT_FILENO);
+                for (int j = 0; j < num_Commands - 1; j++) {
                     close(fd[j][0]);
                     close(fd[j][1]);
                 }
-                execvp(command,arguments);
-                return;
-            }
-            else if(i==num_Commands-1){
-                dup2(fd[i-1][0],STDIN_FILENO);
-                for(int j=0;j<num_Commands-1;j++){
+                if (execvp(command, arguments) == -1) {
+                    perror("execvp");
+                    return;
+                }
+            } else if (i == num_Commands - 1) {
+                dup2(fd[i - 1][0], STDIN_FILENO);
+                for (int j = 0; j < num_Commands - 1; j++) {
                     close(fd[j][0]);
                     close(fd[j][1]);
                 }
-                execvp(command,arguments);
-                return;
-            }
-            else{
-                dup2(fd[i-1][0],STDIN_FILENO);
-                dup2(fd[i][1],STDOUT_FILENO);
-                for(int j=0;j<num_Commands-1;j++){
+                if (execvp(command, arguments) == -1) {
+                    perror("execvp");
+                    return;
+                }
+            } else {
+                dup2(fd[i - 1][0], STDIN_FILENO);
+                dup2(fd[i][1], STDOUT_FILENO);
+                for (int j = 0; j < num_Commands - 1; j++) {
                     close(fd[j][0]);
                     close(fd[j][1]);
                 }
-                execvp(command,arguments);
-                return;
+                if (execvp(command, arguments) == -1) {
+                    perror("execvp");
+                    return;
+                }
             }
         }
     }
 
-    for(int j=0;j<num_Commands-1;j++){
+    for (int j = 0; j < num_Commands - 1; j++) {
         close(fd[j][0]);
         close(fd[j][1]);
     }
-    
 
-    time(&(cmnd_Array[cmnd_count - 1].start_time));
     time_t startTime;
     time(&startTime);
-    for(int i=0;i<num_Commands;i++){
-        waitpid(pids[i], NULL, 0);
+    for (int i = 0; i < num_Commands; i++) {
+        int status;
+        if (waitpid(pids[i], &status, 0) == -1) {
+            perror("waitpid");
+            exit(EXIT_FAILURE);
+        }
+        if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+            fprintf(stderr, "Child process %d exited with an error status\n", pids[i]);
+            // Handle the error as needed.
+        }
     }
     time_t endTime;
     time(&endTime);
 
     cmnd_Array[cmnd_count - 1].execution_time=difftime(endTime,startTime);
     return;
-
 }
 
 void remove_Spaces(char* str) {
@@ -362,7 +362,6 @@ void shell_Loop() {
     char input[1000];
     char command[1000];
     char* arguments[1000];
-    // signal(SIGINT, my_handler);
     do {
         printf(">>> simpleshell $ ");
         fflush(stdout);
