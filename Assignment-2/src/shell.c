@@ -8,7 +8,6 @@
 #include <string.h>
 #include <time.h>
 
-// pipes &bonus are left
 
 
 struct cmnd_Elt {
@@ -31,19 +30,67 @@ static void my_handler(int signum) {
     } 
 }
 
+void remove_and(char* str) {
+    for(int i=0;i<strlen(str);i++){
+        if(str[i]=='&'){
+            str[i]='\0';
+        }
+    }
+}
+
+void background_process_creation(char* command, char** arguments){
+    time(&(cmnd_Array[cmnd_count - 1].start_time));
+    int child_PID = fork();
+    if(child_PID < 0) {
+        printf("Something went wrong.\n");
+        exit(10);
+    } 
+    else if(child_PID == 0) {
+        // printf("I am the child process.\n");
+        // char* args[3] = {command,arguments[1],NULL};
+        if (execvp(command, arguments) == -1) {
+            perror("execvp");
+            exit(10);
+        }
+        // time(&(cmnd_Array[cmnd_count - 1].start_time));
+        // printf("I should never get printed.\n");
+    } 
+    else {
+        printf("%d\n",child_PID);
+        // int ret;
+
+    }
+    // return 0;
+}
 
 
 int read_user_input(char* input,int size, char*command, char** arguments){
     fgets(input,size,stdin);
     if(ctrl_clicked){
-        return 5;
+        return 1;
     }
     if (cmnd_count < 100) {
             strcpy(cmnd_Array[cmnd_count].command, input);
             cmnd_count++;
     }
+
     if(strstr(input,"|")){
-        return 0;
+        return 2;
+    }
+    else if(strstr(input,"&")){
+        remove_and(input);
+        // printf("%s",input);
+        input[strcspn(input, "\n")] = '\0';
+        char * temp= strtok(input," \n");
+        strcpy(command, temp);
+        int i = 0;
+        while (temp != NULL) { 
+            arguments[i] = temp;
+            temp = strtok(NULL, " \n");
+            i++;
+        }
+        arguments[i] = NULL;
+        return 3;
     }
     else{
         input[strcspn(input, "\n")] = '\0';
@@ -107,17 +154,30 @@ int launch (char* command, char** arguments) {
 }
 
 void cd_Func(char *path) {
+    time(&cmnd_Array[cmnd_count-1].start_time);
+    time_t startTime;
+    time(&startTime);
     if (chdir(path) != 0) {
         perror("cd");
     }
+    
+    time_t endTime;
+    time(&endTime);
+    cmnd_Array[cmnd_count - 1].execution_time=difftime(endTime,startTime);
 }
 
-
 void print_History(){
+    time(&cmnd_Array[cmnd_count-1].start_time);
+    time_t startTime;
+    time(&startTime);
+    time(&cmnd_Array[cmnd_count-1].start_time);
     for (int i = 0; i < cmnd_count; i++) {
-        printf("%d- %s \n", i + 1, cmnd_Array[i].command);
+        printf("%d- %s", i + 1, cmnd_Array[i].command);
         int j=1;
     }
+    time_t endTime;
+    time(&endTime);
+    cmnd_Array[cmnd_count - 1].execution_time=difftime(endTime,startTime);
 }
 
 void print_On_Exit(){
@@ -129,7 +189,6 @@ void print_On_Exit(){
         cmnd_Array[i].execution_time);
     }
 }
-
 
 
 int read_input_piped(char* input,char*command, char** arguments){
@@ -149,8 +208,6 @@ int read_input_piped(char* input,char*command, char** arguments){
     arguments[i] = NULL;
     return 0;
 }
-
-
 
 void execute_piped_commands(char** input_List, int num_Commands){
 
@@ -226,7 +283,6 @@ void execute_piped_commands(char** input_List, int num_Commands){
 
 }
 
-
 void remove_Spaces(char* str) {
     if(str[0]==' '){
         for(int i=0;i<strlen(str)-1;i++){
@@ -257,8 +313,12 @@ void process_piped_commands(char* piped_Input){
     execute_piped_commands(input_List,num_Commands);
 }
 
+
 // to run shell-script run 'rs <filename>' (rs short for runscript)
-void executeShellScript(const char* scriptFileName) {
+void execute_shell_script(const char* scriptFileName) {
+    time_t startTime;
+    time(&startTime);
+    time(&cmnd_Array[cmnd_count-1].start_time);
     char command[256];
     FILE* scriptFile = fopen(scriptFileName, "r");
 
@@ -270,16 +330,31 @@ void executeShellScript(const char* scriptFileName) {
     while (fgets(command, sizeof(command), scriptFile) != NULL) {
         command[strcspn(command, "\n")] = '\0';
 
-        int result = system(command);
+        pid_t child_pid = fork();
 
-        if (result == -1) {
-            perror("Error executing command");
-        } else if (result != 0) {
-            printf("Command returned non-zero exit status: %d\n", result);
+        if (child_pid == -1) {
+            perror("Error creating child process");
+        } else if (child_pid == 0) { 
+            int result = execl("/bin/sh", "sh", "-c", command, (char *)NULL);
+
+            if (result == -1) {
+                perror("Error executing command");
+                exit(EXIT_FAILURE);
+            }
+        } else { 
+            int status;
+            if (waitpid(child_pid, &status, 0) == -1) {
+                perror("Error waiting for child process");
+            } else if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+                printf("Command returned non-zero exit status\n");
+            }
         }
     }
-
+    time_t endTime;
+    time(&endTime);
+    cmnd_Array[cmnd_count - 1].execution_time=difftime(endTime,startTime);
     fclose(scriptFile);
+
 }
 
 
@@ -289,15 +364,18 @@ void shell_Loop() {
     char* arguments[1000];
     // signal(SIGINT, my_handler);
     do {
-        printf("(SimpleShell) ");
+        printf(">>> simpleshell $ ");
         fflush(stdout);
         int sig_recieved= read_user_input(input, sizeof(input), command, arguments);
-        if(sig_recieved){
+        if(sig_recieved==1){
             print_On_Exit();
             return;
         }
-        if(strstr(input,"|")){
+        if(sig_recieved==2){
             process_piped_commands(input);
+        }
+        else if(sig_recieved==3){
+            background_process_creation(command,arguments);
         }
         else if(strcmp(command,"history")==0){
             print_History();
@@ -309,7 +387,7 @@ void shell_Loop() {
         }
         else if (strcmp(command, "rs") == 0) {
             if (arguments[1] != NULL) {
-                executeShellScript(arguments[1]);
+                execute_shell_script(arguments[1]);
             }
         }
         else{
