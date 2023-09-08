@@ -10,7 +10,6 @@
 
 // pipes & bonus are left
 
-
 struct cmnd_Elt {
     char command[1024];
     int pid;
@@ -19,19 +18,14 @@ struct cmnd_Elt {
 };
 
 struct cmnd_Elt cmnd_Array[100];
-
 int cmnd_count = 0;
-
 int ctrl_clicked=0;
-
 
 static void my_handler(int signum) {
     if(signum == SIGINT) {
         ctrl_clicked=1;
     } 
 }
-
-
 
 int read_user_input(char* input,int size, char*command, char** arguments){
     fgets(input,size,stdin);
@@ -47,7 +41,6 @@ int read_user_input(char* input,int size, char*command, char** arguments){
     char * temp= strtok(input," \n");
     strcpy(command, temp);
 
-    
     int i = 0;
     while (temp != NULL) { 
         arguments[i] = temp;
@@ -108,7 +101,6 @@ void cd_Func(char *path) {
     }
 }
 
-
 void print_History(){
     for (int i = 0; i < cmnd_count; i++) {
         printf("%d- %s \n", i + 1, cmnd_Array[i].command);
@@ -126,35 +118,68 @@ void print_On_Exit(){
     }
 }
 
+// to run shell-script run 'rs <filename>' (rs short for runscript)
+void executeShellScript(const char* scriptFileName) {
+    char command[256];
+    FILE* scriptFile = fopen(scriptFileName, "r");
+
+    if (scriptFile == NULL) {
+        perror("Error opening script file");
+        return;
+    }
+
+    while (fgets(command, sizeof(command), scriptFile) != NULL) {
+        command[strcspn(command, "\n")] = '\0';
+
+        int result = system(command);
+
+        if (result == -1) {
+            perror("Error executing command");
+        } else if (result != 0) {
+            printf("Command returned non-zero exit status: %d\n", result);
+        }
+    }
+
+    fclose(scriptFile);
+}
 
 void shell_Loop() {
     char input[1024];
     char command[1024];
     char* arguments[1024];
-    // signal(SIGINT, my_handler);
+
     do {
-        printf("(SimpleShell) ");
+        printf(">>> $ ");
         fflush(stdout);
-        int sig_recieved= read_user_input(input, sizeof(input), command, arguments);
-        if(sig_recieved){
+        int sig_received = read_user_input(input, sizeof(input), command, arguments);
+        if (sig_received) {
             print_On_Exit();
             return;
         }
-        if(strcmp(command,"history")==0){
+
+        if (strcmp(command, "history") == 0) {
             print_History();
-        }
-        else if (strcmp(command, "cd") == 0) {
+        } else if (strcmp(command, "cd") == 0) {
             if (arguments[1] != NULL) {
                 cd_Func(arguments[1]);
-            } 
-        }
-        else{
+            }
+        } else if (strcmp(command, "rs") == 0) {
+            if (arguments[1] != NULL) {
+                executeShellScript(arguments[1]);
+            } else {
+                printf("Usage: rs <script_filename>\n");
+            }
+        } else if (strcmp(command, "rs") == 0) {
+            if (arguments[1] != NULL) {
+                executeShellScript(arguments[1]);
+            } else {
+                printf("Usage: rs <script_filename>\n");
+            }
+        } else {
             launch(command, arguments);
         }
-    } 
-    while (1);
+    } while (1);
 }
-
 
 int main(){
     struct sigaction sig;
