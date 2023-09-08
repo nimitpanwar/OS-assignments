@@ -46,14 +46,22 @@ void background_process_creation(char* command, char** arguments){
         exit(10);
     } 
     else if(child_PID == 0) {
-        if (execvp(command, arguments) == -1) {
-            perror("execvp");
-            exit(10);
+        int grandchild_PID=fork();
+        if(grandchild_PID<0) {
+            perror("fork");
+        }
+        else if (grandchild_PID == 0) {
+            if (execvp(command, arguments) == -1) {
+                perror("execvp");
+                exit(10);
+            }
+        } 
+        else {
+            _exit(0);
         }
     } 
     else {
         printf("%d\n",child_PID);
-
     }
 }
 
