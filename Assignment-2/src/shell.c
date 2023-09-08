@@ -14,7 +14,7 @@ struct cmnd_Elt {
     char command[1000];
     int pid;
     time_t start_time;
-    double execution_time;
+    long long execution_time;
 };
 
 struct cmnd_Elt cmnd_Array[100];
@@ -39,7 +39,10 @@ void remove_and(char* str) {
 }
 
 void background_process_creation(char* command, char** arguments){
-    time(&(cmnd_Array[cmnd_count - 1].start_time));
+    struct timespec start_time, end_time;
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
+    
+    time(&(cmnd_Array[cmnd_count-1].start_time));
     int child_PID = fork();
     if(child_PID < 0) {
         perror("fork");
@@ -62,7 +65,8 @@ void background_process_creation(char* command, char** arguments){
     } 
     else {
         printf("%d\n",child_PID);
-
+        clock_gettime(CLOCK_MONOTONIC, &end_time);
+        cmnd_Array[cmnd_count - 1].execution_time = (end_time.tv_sec - start_time.tv_sec) * 1000LL + (end_time.tv_nsec - start_time.tv_nsec) / 1000000LL;
     }
 }
 
@@ -130,14 +134,14 @@ int create_process_and_run(char* command, char** arguments) {
     } 
     else {
         int ret;
-        time(&(cmnd_Array[cmnd_count - 1].start_time));
-        time_t startTime;
-        time(&startTime);
+        struct timespec start_time, end_time;
+        time(&(cmnd_Array[cmnd_count-1].start_time));
+        clock_gettime(CLOCK_MONOTONIC, &start_time);
         waitpid(child_PID, &ret, 0);
-        time_t endTime;
-        time(&endTime);
+        clock_gettime(CLOCK_MONOTONIC, &end_time);
         if(WIFEXITED(ret)) {
-            cmnd_Array[cmnd_count - 1].execution_time=difftime(endTime,startTime);
+            // cmnd_Array[cmnd_count - 1].execution_time=difftime(endTime,startTime);
+            cmnd_Array[cmnd_count - 1].execution_time = (end_time.tv_sec - start_time.tv_sec) * 1000LL + (end_time.tv_nsec - start_time.tv_nsec) / 1000000LL;
             cmnd_Array[cmnd_count - 1].pid=child_PID;
 
         } 
@@ -155,41 +159,41 @@ int launch (char* command, char** arguments) {
 }
 
 void cd_Func(char *path) {
-    time(&cmnd_Array[cmnd_count-1].start_time);
-    time_t startTime;
-    time(&startTime);
+    time(&(cmnd_Array[cmnd_count-1].start_time));
+    struct timespec start_time, end_time;
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
     if (chdir(path) != 0) {
         perror("cd");
     }
     
-    time_t endTime;
-    time(&endTime);
-    cmnd_Array[cmnd_count - 1].execution_time=difftime(endTime,startTime);
+    clock_gettime(CLOCK_MONOTONIC, &end_time);
+    cmnd_Array[cmnd_count - 1].execution_time= (end_time.tv_sec - start_time.tv_sec) * 1000LL + (end_time.tv_nsec - start_time.tv_nsec) / 1000000LL;
+
 }
 
 void print_History(){
-    time(&cmnd_Array[cmnd_count-1].start_time);
-    time_t startTime;
-    time(&startTime);
-    time(&cmnd_Array[cmnd_count-1].start_time);
+    // time(&cmnd_Array[cmnd_count-1].start_time);
+    time(&(cmnd_Array[cmnd_count-1].start_time));
+    struct timespec start_time, end_time;
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
     for (int i = 0; i < cmnd_count; i++) {
         printf("%d- %s", i + 1, cmnd_Array[i].command);
         int j=1;
     }
-    time_t endTime;
-    time(&endTime);
-    cmnd_Array[cmnd_count - 1].execution_time=difftime(endTime,startTime);
+    clock_gettime(CLOCK_MONOTONIC, &end_time);
+    cmnd_Array[cmnd_count - 1].execution_time= (end_time.tv_sec - start_time.tv_sec) * 1000LL + (end_time.tv_nsec - start_time.tv_nsec) / 1000000LL;
 }
 
 void print_On_Exit(){
     printf("\nNo. : Command    PID    Start Time   Execution Time\n");
     for (int i = 0; i < cmnd_count; i++) {
-        printf("%d : %s    %d    %s    %.2lf seconds\n",i+1, 
+        printf("%d : %s    %d    %s    %.2lld milliseconds\n",i+1, 
         cmnd_Array[i].command, cmnd_Array[i].pid,
         asctime(localtime(&cmnd_Array[i].start_time)),
         cmnd_Array[i].execution_time);
     }
 }
+
 
 
 int read_input_piped(char* input,char*command, char** arguments){
@@ -276,9 +280,9 @@ void execute_piped_commands(char** input_List, int num_Commands) {
         close(fd[j][1]);
     }
 
-    time_t startTime;
-    time(&cmnd_Array[cmnd_count-1].start_time);
-    time(&startTime);
+    time(&(cmnd_Array[cmnd_count-1].start_time));
+    struct timespec start_time, end_time;
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
     for (int i = 0; i < num_Commands; i++) {
         int status;
         if (waitpid(pids[i], &status, 0) == -1) {
@@ -287,13 +291,11 @@ void execute_piped_commands(char** input_List, int num_Commands) {
         }
         if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
             fprintf(stderr, "Child process %d exited with an error status\n", pids[i]);
-            // Handle the error as needed.
         }
     }
-    time_t endTime;
-    time(&endTime);
+    clock_gettime(CLOCK_MONOTONIC, &end_time);  
 
-    cmnd_Array[cmnd_count - 1].execution_time=difftime(endTime,startTime);
+    cmnd_Array[cmnd_count - 1].execution_time=(end_time.tv_sec - start_time.tv_sec) * 1000LL + (end_time.tv_nsec - start_time.tv_nsec) / 1000000LL;
     return;
 }
 
@@ -330,9 +332,9 @@ void process_piped_commands(char* piped_Input){
 
 // to run shell-script run 'rs <filename>' (rs short for runscript)
 void execute_shell_script(const char* scriptFileName) {
-    time_t startTime;
-    time(&startTime);
-    time(&cmnd_Array[cmnd_count-1].start_time);
+    struct timespec start_time, end_time;
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
+    time(&(cmnd_Array[cmnd_count-1].start_time));
     char command[256];
     FILE* scriptFile = fopen(scriptFileName, "r");
 
@@ -364,15 +366,17 @@ void execute_shell_script(const char* scriptFileName) {
             }
         }
     }
-    time_t endTime;
-    time(&endTime);
-    cmnd_Array[cmnd_count - 1].execution_time=difftime(endTime,startTime);
+    clock_gettime(CLOCK_MONOTONIC, &end_time);
+    cmnd_Array[cmnd_count - 1].execution_time=(end_time.tv_sec - start_time.tv_sec) * 1000LL + (end_time.tv_nsec - start_time.tv_nsec) / 1000000LL;
     fclose(scriptFile);
 
 }
 
 
 void background_with_piped_creation(char* piped_Input){
+    struct timespec start_time, end_time;
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
+
     char* input_List[1024];
     int num_Commands=0;
     piped_Input[strcspn(piped_Input, "\n")] = '\0';
@@ -445,13 +449,14 @@ void background_with_piped_creation(char* piped_Input){
             }
         }
     }
-    time(&cmnd_Array[cmnd_count-1].start_time);
+    // time(&cmnd_Array[cmnd_count-1].start_time);
+    time(&(cmnd_Array[cmnd_count-1].start_time));
     for (int j = 0; j < num_Commands - 1; j++) {
         close(fd[j][0]);
         close(fd[j][1]);
     }
-
-
+    clock_gettime(CLOCK_MONOTONIC, &end_time);
+    cmnd_Array[cmnd_count-1].execution_time=(end_time.tv_sec - start_time.tv_sec) * 1000LL + (end_time.tv_nsec - start_time.tv_nsec) / 1000000LL;
     return;
 
 }
