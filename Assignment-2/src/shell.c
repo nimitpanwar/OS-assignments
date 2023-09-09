@@ -60,6 +60,7 @@ void background_process_creation(char* command, char** arguments){
             }
         } 
         else {
+            cmnd_Array[cmnd_count - 1].pid=child_PID;
             _exit(0);
         }
     } 
@@ -67,6 +68,7 @@ void background_process_creation(char* command, char** arguments){
         printf("%d\n",child_PID);
         clock_gettime(CLOCK_MONOTONIC, &end_time);
         cmnd_Array[cmnd_count - 1].execution_time = (end_time.tv_sec - start_time.tv_sec) * 1000LL + (end_time.tv_nsec - start_time.tv_nsec) / 1000000LL;
+        cmnd_Array[cmnd_count - 1].pid=child_PID;
     }
 }
 
@@ -294,7 +296,7 @@ void execute_piped_commands(char** input_List, int num_Commands) {
         }
     }
     clock_gettime(CLOCK_MONOTONIC, &end_time);  
-
+    cmnd_Array[cmnd_count - 1].pid=pids[0];
     cmnd_Array[cmnd_count - 1].execution_time=(end_time.tv_sec - start_time.tv_sec) * 1000LL + (end_time.tv_nsec - start_time.tv_nsec) / 1000000LL;
     return;
 }
@@ -457,6 +459,7 @@ void background_with_piped_creation(char* piped_Input){
     }
     clock_gettime(CLOCK_MONOTONIC, &end_time);
     cmnd_Array[cmnd_count-1].execution_time=(end_time.tv_sec - start_time.tv_sec) * 1000LL + (end_time.tv_nsec - start_time.tv_nsec) / 1000000LL;
+    cmnd_Array[cmnd_count - 1].pid=pids[0];
     return;
 
 }
