@@ -8,7 +8,11 @@
 #include <string.h>
 #include <time.h>
 
-// pipes & bonus(1) are left
+
+
+int NCPU;
+int TSLICE;
+
 
 struct cmnd_Elt {
     char command[1024];
@@ -95,12 +99,6 @@ int launch (char* command, char** arguments) {
     return status;
 }
 
-void cd_Func(char *path) {
-    if (chdir(path) != 0) {
-        perror("cd");
-    }
-}
-
 void print_History(){
     for (int i = 0; i < cmnd_count; i++) {
         printf("%d- %s \n", i + 1, cmnd_Array[i].command);
@@ -118,36 +116,11 @@ void print_On_Exit(){
     }
 }
 
-// to run shell-script run 'rs <filename>' (rs short for runscript)
-void executeShellScript(const char* scriptFileName) {
-    char command[256];
-    FILE* scriptFile = fopen(scriptFileName, "r");
-
-    if (scriptFile == NULL) {
-        perror("Error opening script file");
-        return;
-    }
-
-    while (fgets(command, sizeof(command), scriptFile) != NULL) {
-        command[strcspn(command, "\n")] = '\0';
-
-        int result = system(command);
-
-        if (result == -1) {
-            perror("Error executing command");
-        } else if (result != 0) {
-            printf("Command returned non-zero exit status: %d\n", result);
-        }
-    }
-
-    fclose(scriptFile);
-}
 
 void shell_Loop() {
     char input[1024];
     char command[1024];
     char* arguments[1024];
-
     do {
         printf(">>> $ ");
         fflush(stdout);
@@ -156,26 +129,28 @@ void shell_Loop() {
             print_On_Exit();
             return;
         }
-
         if (strcmp(command, "history") == 0) {
             print_History();
-        } else if (strcmp(command, "cd") == 0) {
-            if (arguments[1] != NULL) {
-                cd_Func(arguments[1]);
-            }
-        } else if (strcmp(command, "rs") == 0) {
-            if (arguments[1] != NULL) {
-                executeShellScript(arguments[1]);
-            } else {
-                printf("Usage: rs <script_filename>\n");
-            }
-        } else {
+        } 
+        if(strcmp(command, "submit") == 0){
+            printf("Yes\n");
+        }
+        else {
             launch(command, arguments);
         }
     } while (1);
 }
 
-int main(){
+int main(int argc, char* argv[]) {
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s <integer1> <integer2>\n", argv[0]);
+        return 1;
+    }
+
+    NCPU = atoi(argv[1]);
+
+    TSLICE = atoi(argv[2]);
+
     struct sigaction sig;
     memset(&sig, 0, sizeof(sig));
     sig.sa_handler = my_handler;
@@ -185,3 +160,20 @@ int main(){
 
     return 0;
 }
+
+// T quantum=  3
+// submit fib 40, Burst time =5
+// enqueue fib 40 , flag =0 , state = Ready
+// dequeue fib 40
+// execvp(fib 40) , flag=1 ,  state = Running
+// execute fib for 3 seconds;
+// pause fib(use pause function)
+// enqueue fib 40 , with process id, flag=1 , state = Ready , t=3
+// dequeue fib 40 if flag =1 
+// send signal to resume execution
+// executes for 2 seconds
+// ends
+// dequeue next process
+
+
+
