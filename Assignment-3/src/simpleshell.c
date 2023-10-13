@@ -76,7 +76,6 @@ void enqueue (queue* q,int p){
 void create_process_for_scheduler(queue* ready_queue, char* executable) {
     int length = strlen(executable);
 
-    // Check if the length is less than 3 (minimum for "./x")
     if (length < 3) {
         printf("Invalid input: %s\n", executable);
         return;
@@ -85,7 +84,6 @@ void create_process_for_scheduler(queue* ready_queue, char* executable) {
     char argument[length - 1];
     int j = 0;
 
-    // Skip the first two characters (typically "./")
     for (int i = 2; i < length; i++) {
         argument[j] = executable[i];
         j++;
@@ -106,10 +104,11 @@ void create_process_for_scheduler(queue* ready_queue, char* executable) {
     } else {
 
         sem_wait(&ready_queue->mutex);
+        // printf("IN THE SHELL\n");
         enqueue(ready_queue, child_PID);
-        // printf("%d\n",child_PID);
+        // printf("in shell- %d\n",)
         sem_post(&ready_queue->mutex);
-
+        // printf("in shell- %d",child_PID);
     }
 }
 
@@ -129,7 +128,8 @@ void shell_Loop(queue* ready_queue) {
     char cNCPU[3];
     char cTSLICE[4];
 
-    if(fork()==0){                           
+    int sched_pid=fork();
+    if(sched_pid==0){                           
         snprintf(cNCPU, sizeof(cNCPU), "%d", NCPU);
         snprintf(cTSLICE, sizeof(cTSLICE), "%d", TSLICE);              
         execlp("./simpleScheduler", "simpleScheduler",cNCPU, cTSLICE,NULL);
@@ -140,6 +140,9 @@ void shell_Loop(queue* ready_queue) {
             fflush(stdout);
             int sig_received = read_user_input(input, sizeof(input), command, arguments);
             if (sig_received) {
+                kill(sched_pid,SIGINT);
+                sem_destroy(&ready_queue->mutex); 
+                munmap(ready_queue, sizeof(queue));
                 shm_unlink("shared memory");
                 return;
             }
@@ -177,7 +180,7 @@ int main(int argv, char**argc) {
     ftruncate(fd, sizeof(queue));
 
     queue* ready_queue = mmap(0, sizeof(queue), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-
+    close(fd);
     sem_init(&ready_queue->mutex, 1, 1);
 
     ready_queue->front=-1;
