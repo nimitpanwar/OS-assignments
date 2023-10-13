@@ -14,6 +14,30 @@
 int NCPUs;
 int TSLICE;
 
+char* getProcessState(pid_t pid) {
+    char path[64];
+    snprintf(path, sizeof(path), "/proc/%d/status", pid);
+
+    FILE *procfile = fopen(path, "r");
+    if (procfile == NULL) {
+        return "Not Found";
+    }
+
+    char line[256];
+    char* state = "Unknown";
+
+    while (fgets(line, sizeof(line), procfile)) {
+        if (strncmp(line, "State:", 6) == 0) {
+            state = line + 7; 
+            break;
+        }
+    }
+
+    fclose(procfile);
+    // printf("%s",state);
+    return state;
+}
+
 typedef struct Process{
     char pname[100];
     int pid;
@@ -54,24 +78,21 @@ void scheduler(queue* ready_queue) {
 
         sem_wait(&ready_queue->mutex);
         while(!isEmpty(ready_queue) && running_count<NCPUs){
-           running_array[running_count]=dequeue (ready_queue);
-        //    printf("%d %d\n",ready_queue->front, ready_queue->rear);
-           kill(running_array[running_count], SIGCONT);
-           running_count++;
+            // printf("i - %d\n",running_count);
+            kill(running_array[running_count], SIGCONT);
+            running_array[running_count]=dequeue (ready_queue);
+            running_count++; 
         }
         sem_post(&ready_queue->mutex);
 
+
         if(running_count>0){
-            // printf("%d\n",running_count);
             sleep(TSLICE);
         }
         sem_wait(&ready_queue->mutex);
         for (int i = 0; i < running_count; i++) {
             int status;
-            // int result = waitpid(running_array[i], &status, WNOHANG);
-            int result = kill(running_array[i], 0);
-            printf("%d\n",result);
-            if(result==-1){
+            if(getProcessState(running_array[i])[0]!='Z'){
                 printf("YES\n");
                 kill(running_array[i], SIGSTOP);
                 enqueue(ready_queue, running_array[i]);
