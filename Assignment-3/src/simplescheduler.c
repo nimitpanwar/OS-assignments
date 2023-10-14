@@ -51,6 +51,7 @@ char* getProcessState(pid_t pid) {
 typedef struct{
     int pid;
     char name[100];
+    char first_arg[100];
     time_t prev_queued_time;
     double wait_time;
     time_t execution_time;
@@ -61,13 +62,28 @@ struct queue{
     int front;
     int rear;
     sem_t mutex;
+    time_t first_arrival;
 }typedef queue;
 
 
+// process dequeue(queue* q) {
+//     process to_return = q->array[q->front+1];
+//     q->front++;
+//     return to_return;
+// }
+
+
 process dequeue(queue* q) {
-    process to_return = q->array[q->front+1];
-    q->front++;
+    process to_return;
+    to_return= q->array[q->front+1];
+    if (q->front+1 == q->rear) {
+        // The queue is now empty after dequeuing the last element.
+        q->front = q->rear = -1;
+    } else {
+        q->front = (q->front + 1) % 100; // Ensure circular behavior.
+    }
     return to_return;
+
 }
 
 void enqueue (queue* q,process p){
@@ -104,7 +120,7 @@ int main(int argv, char**argc){
     close(fd);
     // scheduler(ready_queue);
 
-    process all_process[1000];
+    process all_processes[1000];
     int process_number=0;
 
     while(!end_print_history){
@@ -139,7 +155,7 @@ int main(int argv, char**argc){
                 }
                 else{
                     running_array[i].execution_time=time(NULL);
-                    all_process[process_number]=running_array[i];
+                    all_processes[process_number]=running_array[i];
                     process_number++;
                 }
             }
@@ -151,11 +167,15 @@ int main(int argv, char**argc){
     printf("\n--------------------------------\n");
     printf("Name   PID   Wait Time    Execution Time\n");
     for(int i=0;i<process_number;i++){
-        printf("%s ",all_process[i].name);
-        printf("%d ",all_process[i].pid);
-        // printf("%s ",ctime(&all_process[i].prev_queued_time));
-        printf(" %.2lf seconds    ",all_process[i].wait_time);
-        printf("%s \n",ctime(&all_process[i].execution_time));
+        printf("%s ",all_processes[i].name);
+        if(strcmp(all_processes[i].first_arg,"NULL")!=0){
+            printf("%s ",all_processes[i].first_arg);
+        }
+        printf("%d ",all_processes[i].pid);
+        // printf("%s ",ctime(&all_processes[i].prev_queued_time));
+        printf("%.2lf seconds ",all_processes[i].wait_time);
+        // printf("%s \n",ctime(&all_processes[i].execution_time));
+        printf("%.2lf seconds\n",difftime(all_processes[i].execution_time,ready_queue->first_arrival));
     }
 
     return 0;
