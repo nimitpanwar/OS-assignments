@@ -14,10 +14,12 @@
 int NCPUs;
 int TSLICE;
 
+int end_print_history=0;
 
 static void my_handler(int signum) {
     if (signum == SIGINT) {
-        exit(0);
+        end_print_history=1;
+        // exit(0);
     }
 }
 
@@ -46,27 +48,29 @@ char* getProcessState(pid_t pid) {
     return state;
 }
 
-typedef struct Process{
-    char pname[100];
+typedef struct{
     int pid;
-    float start_time;
-}Process;
+    char name[100];
+    time_t prev_queued_time;
+    double wait_time;
+    time_t execution_time;
+} process;
 
 struct queue{
-    int array[100];
+    process array[100];
     int front;
     int rear;
     sem_t mutex;
 }typedef queue;
 
 
-int dequeue(queue* q) {
-    int to_return = q->array[q->front+1];
+process dequeue(queue* q) {
+    process to_return = q->array[q->front+1];
     q->front++;
     return to_return;
 }
 
-void enqueue (queue* q,int p){
+void enqueue (queue* q,process p){
     q->rear++;
     q->array[q->rear]=p;
 }
@@ -100,8 +104,11 @@ int main(int argv, char**argc){
     close(fd);
     // scheduler(ready_queue);
 
-    while(1){
-        int running_array[NCPUs];
+    process all_process[1000];
+    int process_number=0;
+
+    while(!end_print_history){
+        process running_array[NCPUs];
         int running_count = 0;
         if(!isEmpty(ready_queue)){
             sem_wait(&ready_queue->mutex);
@@ -110,7 +117,10 @@ int main(int argv, char**argc){
                 printf(" ");
                 running_array[running_count]=dequeue (ready_queue);
                 // printf("in sched- %d\n",running_array[running_count]);
-                kill(running_array[running_count], SIGCONT);
+                kill(running_array[running_count].pid, SIGCONT);
+                time_t starting_time;
+                time(&starting_time);
+                running_array[running_count].wait_time+= difftime(starting_time,running_array->prev_queued_time);
                 running_count++; 
             }
             sem_post(&ready_queue->mutex);
@@ -121,16 +131,32 @@ int main(int argv, char**argc){
             sleep(TSLICE);
             sem_wait(&ready_queue->mutex);
             for (int i = 0; i < running_count; i++) {
-                if(getProcessState(running_array[i])[0]!='Z'){
+                if(getProcessState(running_array[i].pid)[0]!='Z'){
                     // printf("YES\n");
-                    kill(running_array[i], SIGSTOP);
+                    kill(running_array[i].pid, SIGSTOP);
+                    running_array[i].prev_queued_time=time(NULL);
                     enqueue(ready_queue, running_array[i]);
+                }
+                else{
+                    running_array[i].execution_time=time(NULL);
+                    all_process[process_number]=running_array[i];
+                    process_number++;
                 }
             }
             sem_post(&ready_queue->mutex);
         }
 
     }  
+    
+    printf("\n--------------------------------\n");
+    printf("Name   PID   Wait Time    Execution Time\n");
+    for(int i=0;i<process_number;i++){
+        printf("%s ",all_process[i].name);
+        printf("%d ",all_process[i].pid);
+        // printf("%s ",ctime(&all_process[i].prev_queued_time));
+        printf(" %.2lf seconds    ",all_process[i].wait_time);
+        printf("%s \n",ctime(&all_process[i].execution_time));
+    }
 
     return 0;
 }
