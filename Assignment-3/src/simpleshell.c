@@ -14,9 +14,16 @@
 int NCPU;
 int TSLICE;
 
+typedef struct{
+    int pid;
+    char name[100];
+    time_t prev_queued_time;
+    double wait_time;
+    time_t execution_time;
+} process;
 
 typedef struct  {
-    int array[100];
+    process array[100];
     int front;
     int rear;
     sem_t mutex;
@@ -67,7 +74,7 @@ int read_user_input(char* input, int size, char* command, char** arguments) {
     return 0;
 }
 
-void enqueue (queue* q,int p){
+void enqueue (queue* q,process p){
     q->rear++;
     q->array[q->rear]=p;
 }
@@ -103,9 +110,14 @@ void create_process_for_scheduler(queue* ready_queue, char* executable) {
         }
     } else {
 
+        process p;
+        strcpy(p.name,executable);
+        p.pid=child_PID;
+        p.prev_queued_time=time(NULL);
+        p.wait_time=0;
         sem_wait(&ready_queue->mutex);
         // printf("IN THE SHELL\n");
-        enqueue(ready_queue, child_PID);
+        enqueue(ready_queue,p);
         // printf("in shell- %d\n",)
         sem_post(&ready_queue->mutex);
         // printf("in shell- %d",child_PID);
@@ -132,7 +144,7 @@ void shell_Loop(queue* ready_queue) {
     if(sched_pid==0){                           
         snprintf(cNCPU, sizeof(cNCPU), "%d", NCPU);
         snprintf(cTSLICE, sizeof(cTSLICE), "%d", TSLICE);              
-        execlp("./simpleScheduler", "simpleScheduler",cNCPU, cTSLICE,NULL);
+        execlp("./sched2", "sched2",cNCPU, cTSLICE,NULL);
     }
     else{
         do {
