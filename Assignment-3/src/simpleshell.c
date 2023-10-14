@@ -144,7 +144,7 @@ void shell_Loop(queue* ready_queue) {
     if(sched_pid==0){                           
         snprintf(cNCPU, sizeof(cNCPU), "%d", NCPU);
         snprintf(cTSLICE, sizeof(cTSLICE), "%d", TSLICE);              
-        execlp("./sched2", "sched2",cNCPU, cTSLICE,NULL);
+        execlp("./simplescheduler", "simplescheduler",cNCPU, cTSLICE,NULL);
     }
     else{
         do {
