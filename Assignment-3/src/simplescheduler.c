@@ -55,6 +55,7 @@ typedef struct{
     time_t prev_queued_time;
     double wait_time;
     time_t execution_time;
+    int priority;
 } process;
 
 struct queue{
@@ -75,20 +76,47 @@ struct queue{
 
 process dequeue(queue* q) {
     process to_return;
-    to_return= q->array[q->front+1];
-    if (q->front+1 == q->rear) {
+    int highest_priority_index = -1;
+    int highest_priority = -1;
+    for (int i = q->front + 1; i <= q->rear; i++) {
+        if (q->array[i].priority > highest_priority) {
+            highest_priority = q->array[i].priority;
+            highest_priority_index = i;
+        }
+    }
+    if (highest_priority_index == -1) {
+        // The queue is empty.
+        return to_return;
+    }
+    to_return = q->array[highest_priority_index];
+    for (int i = highest_priority_index; i < q->rear; i++) {
+        q->array[i] = q->array[i + 1];
+    }
+    q->rear--;
+    if (q->front > q->rear) {
         // The queue is now empty after dequeuing the last element.
         q->front = q->rear = -1;
-    } else {
-        q->front = (q->front + 1) % 100; // Ensure circular behavior.
     }
     return to_return;
-
 }
 
-void enqueue (queue* q,process p){
-    q->rear++;
-    q->array[q->rear]=p;
+void enqueue(queue* q, process p) {
+    if (q->front == -1 && q->rear == -1) {
+        q->front = 0;
+        q->rear = 0;
+        q->array[q->rear] = p;
+    } else {
+        int i;
+        for (i = q->rear; i >= q->front; i--) {
+            if (p.priority < q->array[i].priority) {
+                q->array[i + 1] = q->array[i];
+            } else {
+                break;
+            }
+        }
+        q->array[i + 1] = p;
+        q->rear++;
+    }
 }
 
 int isEmpty(queue* pt){
