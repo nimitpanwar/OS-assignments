@@ -21,6 +21,7 @@ typedef struct{
     time_t prev_queued_time;
     double wait_time;
     time_t execution_time;
+    int priority;
 } process;
 
 typedef struct  {
@@ -50,8 +51,6 @@ static void my_handler(int signum) {
     }
 }
 
-
-
 int read_user_input(char* input, int size, char* command, char** arguments) {
     fgets(input, size, stdin);
     if (ctrl_clicked) {
@@ -76,9 +75,30 @@ int read_user_input(char* input, int size, char* command, char** arguments) {
     return 0;
 }
 
-void enqueue (queue* q,process p){
-    q->rear++;
-    q->array[q->rear]=p;
+void enqueue(queue* q, process p) {
+    if (q->front == -1 && q->rear == -1) {
+        q->front = 0;
+        q->rear = 0;
+        q->array[q->rear] = p;
+    } else {
+        int i;
+        for (i = q->rear; i >= q->front; i--) {
+            if (p.priority < q->array[i].priority) {
+                q->array[i + 1] = q->array[i];
+            } else {
+                break;
+            }
+        }
+        q->array[i + 1] = p;
+        q->rear++;
+    }
+}
+
+void print_queue(queue* q) {
+    printf("Queue contents:\n");
+    for (int i = q->front; i <= q->rear; i++) {
+        printf("Process name: %s, PID: %d, Priority: %d\n", q->array[i].name, q->array[i].pid, q->array[i].priority);
+    }
 }
 
 
@@ -130,23 +150,25 @@ void create_process_for_scheduler(queue* ready_queue, char** arguments) {
         }
     } else {
 
-        process p;
-        strcpy(p.name,executable);
-        if(new_arguments[1]!=NULL){
-            strcpy(p.first_arg,new_arguments[1]);
+    process p;
+    strcpy(p.name, executable);
+    p.pid = child_PID;
+    p.prev_queued_time = time(NULL);
+    p.wait_time = 0;
+    p.priority = 1; // default priority
+
+    if (arguments[2] != NULL) {
+        int priority = atoi(arguments[2]);
+        if (priority >= 1 && priority <= 4) {
+            p.priority = priority;
+        } else {
+            printf("Invalid priority. Priority must be between 1 and 4. Setting priority to 1.\n");
         }
-        else{
-            strcpy(p.first_arg,"NULL");
-        }
-        p.pid=child_PID;
-        p.prev_queued_time=time(NULL);
-        p.wait_time=0;
-        sem_wait(&ready_queue->mutex);
-        // printf("IN THE SHELL\n");
-        enqueue(ready_queue,p);
-        // printf("in shell- %d\n",)
-        sem_post(&ready_queue->mutex);
-        // printf("in shell- %d",child_PID);
+    }
+
+    sem_wait(&ready_queue->mutex);
+    enqueue(ready_queue, p);
+    sem_post(&ready_queue->mutex);
 
         if(first_job==0){
             ready_queue->first_arrival=p.prev_queued_time;
@@ -154,7 +176,6 @@ void create_process_for_scheduler(queue* ready_queue, char** arguments) {
         }
     }
 }
-
 
 
 int launch(char* command, char** arguments) {
@@ -175,7 +196,7 @@ void shell_Loop(queue* ready_queue) {
     if(sched_pid==0){                           
         snprintf(cNCPU, sizeof(cNCPU), "%d", NCPU);
         snprintf(cTSLICE, sizeof(cTSLICE), "%d", TSLICE);              
-        execlp("./sched", "sched",cNCPU, cTSLICE,NULL);
+        execlp("./scheduler", "scheduler",cNCPU, cTSLICE,NULL);
     }
     else{
         do {
@@ -197,7 +218,7 @@ void shell_Loop(queue* ready_queue) {
                         printf("Maximum process limit reached.\n");
                     }
                 } else {
-                    printf("Usage: submit <pname>\n");
+                    printf("Usage: submit <pname> <priority>\n");
                 }
             }else {
                 launch(command, arguments);
