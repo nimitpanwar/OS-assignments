@@ -80,7 +80,11 @@ void enqueue (queue* q,process p){
 }
 
 
-void create_process_for_scheduler(queue* ready_queue, char* executable) {
+
+void create_process_for_scheduler(queue* ready_queue, char** arguments) {
+    char executable[1024];
+    strcpy(executable,arguments[1]);
+
     int length = strlen(executable);
 
     if (length < 3) {
@@ -88,14 +92,28 @@ void create_process_for_scheduler(queue* ready_queue, char* executable) {
         return;
     }
 
-    char argument[length - 1];
+    char* new_arguments[1024];
+
+    char first_argument[length - 1];
     int j = 0;
 
     for (int i = 2; i < length; i++) {
-        argument[j] = executable[i];
+        first_argument[j] = executable[i];
         j++;
     }
-    argument[j] = '\0';
+    first_argument[j] = '\0';
+
+    new_arguments[0]=first_argument;
+    int i=1;
+    int k=2;
+    while(arguments[k]!=NULL){
+        new_arguments[i]=arguments[k];
+        // printf("%s\n",new_arguments[i]);
+        i++;
+        k++;
+    }
+
+    new_arguments[i]=NULL;
 
     int child_PID = fork();
     if (child_PID < 0) {
@@ -104,7 +122,7 @@ void create_process_for_scheduler(queue* ready_queue, char* executable) {
     } else if (child_PID == 0) {
         int my_pid= getpid();
         kill(my_pid,SIGSTOP);
-        if (execlp(executable, argument, NULL) == -1) {
+        if (execvp(executable, new_arguments) == -1) {
             perror("execlp");
             exit(10);
         }
@@ -144,7 +162,7 @@ void shell_Loop(queue* ready_queue) {
     if(sched_pid==0){                           
         snprintf(cNCPU, sizeof(cNCPU), "%d", NCPU);
         snprintf(cTSLICE, sizeof(cTSLICE), "%d", TSLICE);              
-        execlp("./simplescheduler", "simplescheduler",cNCPU, cTSLICE,NULL);
+        execlp("./sched", "sched",cNCPU, cTSLICE,NULL);
     }
     else{
         do {
@@ -164,7 +182,7 @@ void shell_Loop(queue* ready_queue) {
             if (strcmp(command, "submit") == 0) {
                 if (arguments[1] != NULL) {
                     if (ready_queue->rear< 100-1) {
-                        create_process_for_scheduler(ready_queue,arguments[1]);
+                        create_process_for_scheduler(ready_queue,arguments);
                     } else {
                         printf("Maximum process limit reached.\n");
                     }
