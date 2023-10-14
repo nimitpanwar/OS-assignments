@@ -75,29 +75,20 @@ struct queue{
 
 
 process dequeue(queue* q) {
-    process to_return;
-    int highest_priority_index = -1;
-    int highest_priority = -1;
-    for (int i = q->front + 1; i <= q->rear; i++) {
-        if (q->array[i].priority > highest_priority) {
-            highest_priority = q->array[i].priority;
-            highest_priority_index = i;
+    if (q->front == -1) {
+        printf("Queue is empty.\n");
+        process empty_process = {0};
+        return empty_process;
+    } else {
+        process p = q->array[q->front];
+        if (q->front == q->rear) {
+            q->front = -1;
+            q->rear = -1;
+        } else {
+            q->front++;
         }
+        return p;
     }
-    if (highest_priority_index == -1) {
-        // The queue is empty.
-        return to_return;
-    }
-    to_return = q->array[highest_priority_index];
-    for (int i = highest_priority_index; i < q->rear; i++) {
-        q->array[i] = q->array[i + 1];
-    }
-    q->rear--;
-    if (q->front > q->rear) {
-        // The queue is now empty after dequeuing the last element.
-        q->front = q->rear = -1;
-    }
-    return to_return;
 }
 
 void enqueue(queue* q, process p) {
