@@ -17,6 +17,7 @@ int TSLICE;
 typedef struct{
     int pid;
     char name[100];
+    char first_arg[100];
     time_t prev_queued_time;
     double wait_time;
     time_t execution_time;
@@ -27,9 +28,10 @@ typedef struct  {
     int front;
     int rear;
     sem_t mutex;
+    time_t first_arrival;
 }queue;
 
-
+int first_job=0;
 
 struct cmnd_Elt {
     char command[1024];
@@ -130,6 +132,12 @@ void create_process_for_scheduler(queue* ready_queue, char** arguments) {
 
         process p;
         strcpy(p.name,executable);
+        if(new_arguments[1]!=NULL){
+            strcpy(p.first_arg,new_arguments[1]);
+        }
+        else{
+            strcpy(p.first_arg,"NULL");
+        }
         p.pid=child_PID;
         p.prev_queued_time=time(NULL);
         p.wait_time=0;
@@ -139,6 +147,11 @@ void create_process_for_scheduler(queue* ready_queue, char** arguments) {
         // printf("in shell- %d\n",)
         sem_post(&ready_queue->mutex);
         // printf("in shell- %d",child_PID);
+
+        if(first_job==0){
+            ready_queue->first_arrival=p.prev_queued_time;
+            first_job=1;
+        }
     }
 }
 
@@ -176,9 +189,6 @@ void shell_Loop(queue* ready_queue) {
                 shm_unlink("shared memory");
                 return;
             }
-            if (strcmp(command, "history") == 0) {
-            }
-
             if (strcmp(command, "submit") == 0) {
                 if (arguments[1] != NULL) {
                     if (ready_queue->rear< 100-1) {
