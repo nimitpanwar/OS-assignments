@@ -203,7 +203,7 @@ int main(int argv, char** argc) {
 
         // Check if there are running processes
         if (running_count > 0) {
-            sleep(TSLICE); // Simulate time slice
+            usleep(TSLICE*1000); // Simulate time slice
             sem_wait(&ready_queue->mutex);
             for (int i = 0; i < running_count; i++) {
                 if (getProcessState(running_array[i].pid)[0] != 'Z') {
