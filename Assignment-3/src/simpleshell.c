@@ -24,13 +24,51 @@ typedef struct{
     int priority;
 } process;
 
-typedef struct  {
-    process array[100];
-    int front;
-    int rear;
+typedef struct {
+    process arr[100];
+    int size;
+    int capacity;
     sem_t mutex;
     time_t first_arrival;
-}queue;
+}priority_queue;
+ 
+
+void insertHelper(priority_queue* pq, int index)
+{
+ 
+    // Store parent of element at index
+    // in parent variable
+    int parent = (index - 1) / 2;
+ 
+    if (pq->arr[parent].priority > pq->arr[index].priority) {
+        // Swapping when child is smaller
+        // than parent element
+        process temp = pq->arr[parent];
+        pq->arr[parent] = pq->arr[index];
+        pq->arr[index] = temp;
+ 
+        // Recursively calling insertHelper
+        insertHelper(pq, parent);
+    }
+    else if(pq->arr[parent].priority == pq->arr[index].priority){
+        if(pq->arr[parent].prev_queued_time > pq->arr[index].prev_queued_time){
+            process temp = pq->arr[parent];
+            pq->arr[parent] = pq->arr[index];
+            pq->arr[index] = temp;  
+            insertHelper(pq, parent);
+        }
+    }
+}
+
+void insert(priority_queue* pq, process p)
+{
+ 
+    if (pq->size < pq->capacity) {
+        pq->arr[pq->size] = p;
+        insertHelper(pq, pq->size);
+        pq->size++;
+    }
+}
 
 int first_job=0;
 
@@ -50,6 +88,8 @@ static void my_handler(int signum) {
         ctrl_clicked = 1;
     }
 }
+
+
 
 int read_user_input(char* input, int size, char* command, char** arguments) {
     fgets(input, size, stdin);
@@ -75,39 +115,13 @@ int read_user_input(char* input, int size, char* command, char** arguments) {
     return 0;
 }
 
-void enqueue(queue* q, process p) {
-    if (q->front == -1 && q->rear == -1) {
-        q->front = 0;
-        q->rear = 0;
-        q->array[q->rear] = p;
-    } else {
-        int i;
-        for (i = q->rear; i >= q->front; i--) {
-            if (p.priority < q->array[i].priority) {
-                q->array[i + 1] = q->array[i];
-            } else {
-                break;
-            }
-        }
-        q->array[i + 1] = p;
-        q->rear++;
-    }
-}
-
-void print_queue(queue* q) {
-    printf("Queue contents:\n");
-    for (int i = q->front; i <= q->rear; i++) {
-        printf("Process name: %s, PID: %d, Priority: %d\n", q->array[i].name, q->array[i].pid, q->array[i].priority);
-    }
-}
 
 
-
-void create_process_for_scheduler(queue* ready_queue, char** arguments) {
+void create_process_for_scheduler(priority_queue* ready_queue, char** arguments) {
     char executable[1024];
     strcpy(executable,arguments[1]);
 
-    int length = strlen(executable);
+    int length = strlen(executable);  //  executable = ./fib
 
     if (length < 3) {
         printf("Invalid input: %s\n", executable);
@@ -123,16 +137,40 @@ void create_process_for_scheduler(queue* ready_queue, char** arguments) {
         first_argument[j] = executable[i];
         j++;
     }
-    first_argument[j] = '\0';
+    first_argument[j] = '\0';           // first argument = fib
 
-    new_arguments[0]=first_argument;
-    int i=1;
-    int k=2;
-    while(arguments[k]!=NULL){
-        new_arguments[i]=arguments[k];
-        // printf("%s\n",new_arguments[i]);
+    int i=0;
+    while(arguments[i]!=NULL){
         i++;
-        k++;
+    }
+    int size_of_arguments=i;
+    new_arguments[0]=first_argument;
+    int k=2;
+    if(size_of_arguments>2){
+        i=1;
+        while(arguments[k+1]!=NULL){ 
+            new_arguments[i]=arguments[k];
+            i++;
+            k++;
+        }
+        if(atoi(arguments[k])>4){
+            printf("Valid priority is in the range [1,4].\n");
+            return;
+        }
+
+        if(atoi(arguments[k])<1){
+            printf("Valid priority is in the range [1,4].\n");
+            return;
+        }
+
+    }
+    else{
+        i=1;
+        while(arguments[k]!=NULL){ 
+            new_arguments[i]=arguments[k];
+            i++;
+            k++;
+        }   
     }
 
     new_arguments[i]=NULL;
@@ -150,32 +188,34 @@ void create_process_for_scheduler(queue* ready_queue, char** arguments) {
         }
     } else {
 
-    process p;
-    strcpy(p.name, executable);
-    p.pid = child_PID;
-    p.prev_queued_time = time(NULL);
-    p.wait_time = 0;
-    p.priority = 1; // default priority
-
-    if (arguments[2] != NULL) {
-        int priority = atoi(arguments[2]);
-        if (priority >= 1 && priority <= 4) {
-            p.priority = priority;
-        } else {
-            printf("Invalid priority. Priority must be between 1 and 4. Setting priority to 1.\n");
+        process p;
+        strcpy(p.name,executable);
+        if(new_arguments[1]!=NULL){
+            strcpy(p.first_arg,new_arguments[1]);
         }
-    }
-
-    sem_wait(&ready_queue->mutex);
-    enqueue(ready_queue, p);
-    sem_post(&ready_queue->mutex);
-
+        else{
+            strcpy(p.first_arg,"NULL");
+        }
+        p.pid=child_PID;
+        p.prev_queued_time=time(NULL);
+        p.wait_time=0;
+        if(size_of_arguments>2){
+            p.priority=atoi(arguments[k]);
+        }
+        else{
+            p.priority=1;
+        }
+        printf("priority - %d\n", p.priority);
+        sem_wait(&ready_queue->mutex);
+        insert(ready_queue,p);
+        sem_post(&ready_queue->mutex);
         if(first_job==0){
             ready_queue->first_arrival=p.prev_queued_time;
             first_job=1;
         }
     }
 }
+
 
 
 int launch(char* command, char** arguments) {
@@ -185,7 +225,7 @@ int launch(char* command, char** arguments) {
 }
 
 
-void shell_Loop(queue* ready_queue) {
+void shell_Loop(priority_queue* ready_queue) {
     char input[1024];
     char command[1024];
     char* arguments[1024];
@@ -196,7 +236,7 @@ void shell_Loop(queue* ready_queue) {
     if(sched_pid==0){                           
         snprintf(cNCPU, sizeof(cNCPU), "%d", NCPU);
         snprintf(cTSLICE, sizeof(cTSLICE), "%d", TSLICE);              
-        execlp("./scheduler", "scheduler",cNCPU, cTSLICE,NULL);
+        execlp("./adv_sched", "adv_sched",cNCPU, cTSLICE,NULL);
     }
     else{
         do {
@@ -206,19 +246,24 @@ void shell_Loop(queue* ready_queue) {
             if (sig_received) {
                 kill(sched_pid,SIGINT);
                 sem_destroy(&ready_queue->mutex); 
-                munmap(ready_queue, sizeof(queue));
-                shm_unlink("shared memory");
+                munmap(ready_queue, sizeof(priority_queue));
+                shm_unlink("sm2");
                 return;
             }
             if (strcmp(command, "submit") == 0) {
                 if (arguments[1] != NULL) {
-                    if (ready_queue->rear< 100-1) {
+                    if (ready_queue->size< 100) {
+                        // int i=0;
+                        // while(arguments[i]!=NULL){
+                        //     printf("%s\n",arguments[i]);
+                        //     i++;
+                        // }
                         create_process_for_scheduler(ready_queue,arguments);
                     } else {
                         printf("Maximum process limit reached.\n");
                     }
                 } else {
-                    printf("Usage: submit <pname> <priority>\n");
+                    printf("Usage: submit <pname>\n");
                 }
             }else {
                 launch(command, arguments);
@@ -237,15 +282,14 @@ int main(int argv, char**argc) {
     sig.sa_handler = my_handler;
     sigaction(SIGINT, &sig, NULL);
 
-    int fd = shm_open("shared memory", O_CREAT | O_RDWR, 0666);
-    ftruncate(fd, sizeof(queue));
+    int fd = shm_open("sm2", O_CREAT | O_RDWR, 0666);
+    ftruncate(fd, sizeof(priority_queue));
 
-    queue* ready_queue = mmap(0, sizeof(queue), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    priority_queue* ready_queue = mmap(0, sizeof(priority_queue), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     close(fd);
     sem_init(&ready_queue->mutex, 1, 1);
-
-    ready_queue->front=-1;
-    ready_queue->rear=-1;
+    ready_queue->capacity=100;
+    ready_queue->size=0;
     shell_Loop(ready_queue);
 
     return 0;
