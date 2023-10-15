@@ -19,7 +19,6 @@ int end_print_history=0;
 static void my_handler(int signum) {
     if (signum == SIGINT) {
         end_print_history=1;
-        // exit(0);
     }
 }
 
@@ -58,69 +57,122 @@ typedef struct{
     int priority;
 } process;
 
-struct queue{
-    process array[100];
-    int front;
-    int rear;
+typedef struct {
+    process arr[100];
+    int size;
+    int capacity;
     sem_t mutex;
     time_t first_arrival;
-}typedef queue;
+}priority_queue;
+ 
 
-
-// process dequeue(queue* q) {
-//     process to_return = q->array[q->front+1];
-//     q->front++;
-//     return to_return;
-// }
-
-
-process dequeue(queue* q) {
-    if (q->front == -1) {
-        printf("Queue is empty.\n");
-        process empty_process = {0};
-        return empty_process;
-    } else {
-        process p = q->array[q->front];
-        if (q->front == q->rear) {
-            q->front = -1;
-            q->rear = -1;
-        } else {
-            q->front++;
+void insertHelper(priority_queue* pq, int index)
+{
+ 
+    // Store parent of element at index
+    // in parent variable
+    int parent = (index - 1) / 2;
+ 
+    if (pq->arr[parent].priority > pq->arr[index].priority) {
+        // Swapping when child is smaller
+        // than parent element
+        process temp = pq->arr[parent];
+        pq->arr[parent] = pq->arr[index];
+        pq->arr[index] = temp;
+ 
+        // Recursively calling insertHelper
+        insertHelper(pq, parent);
+    }
+    else if(pq->arr[parent].priority == pq->arr[index].priority){
+        if(pq->arr[parent].prev_queued_time < pq->arr[index].prev_queued_time){
+            process temp = pq->arr[parent];
+            pq->arr[parent] = pq->arr[index];
+            pq->arr[index] = temp;  
+            insertHelper(pq, parent);
         }
-        return p;
     }
 }
 
-void enqueue(queue* q, process p) {
-    if (q->front == -1 && q->rear == -1) {
-        q->front = 0;
-        q->rear = 0;
-        q->array[q->rear] = p;
-    } else {
-        int i;
-        for (i = q->rear; i >= q->front; i--) {
-            if (p.priority < q->array[i].priority) {
-                q->array[i + 1] = q->array[i];
-            } else {
-                break;
-            }
+
+void insert(priority_queue* pq, process p)
+{
+ 
+    if (pq->size < pq->capacity) {
+        pq->arr[pq->size] = p;
+        insertHelper(pq, pq->size);
+        pq->size++;
+    }
+}
+
+
+void minHeapify(priority_queue* pq, int index)
+{
+    int left = index * 2 + 1;
+    int right = index * 2 + 2;
+    int min = index;
+ 
+    // Checking whether our left or child element
+    // is at right index or not to avoid index error
+    if (left >= pq->size || left < 0)
+        left = -1;
+    if (right >= pq->size || right < 0)
+        right = -1;
+ 
+    // store left or right element in min if
+    // any of these is smaller that its parent
+    if (left != -1 && pq->arr[left].priority < pq->arr[index].priority){
+        min = left;
+    }
+    else if(left != -1 && pq->arr[left].priority == pq->arr[index].priority){
+        if(pq->arr[left].prev_queued_time < pq->arr[index].prev_queued_time){
+           min = left; 
         }
-        q->array[i + 1] = p;
-        q->rear++;
+    }
+
+    if (right != -1 && pq->arr[right].priority < pq->arr[index].priority)
+        min = right;
+    else if(right != -1 && pq->arr[right].priority == pq->arr[index].priority){
+        if(pq->arr[right].prev_queued_time < pq->arr[index].prev_queued_time){
+           min = right;
+        }
+    }
+    
+
+    // Swapping the nodes
+    if (min != index) {
+        process temp = pq->arr[min];
+        pq->arr[min] = pq->arr[index];
+        pq->arr[index] = temp;
+ 
+        // recursively calling for their child elements
+        // to maintain min heap
+        minHeapify(pq, min);
     }
 }
 
-int isEmpty(queue* pt){
-    if(pt->front==pt->rear){
-        return 1;
-    }
-    return 0;
+process extractMin(priority_queue* pq)
+{
+    process deleteItem;
+ 
+    // Checking if the heap is empty or not
+ 
+    // Store the node in deleteItem that
+    // is to be deleted.
+    deleteItem = pq->arr[0];
+ 
+    // Replace the deleted node with the last node
+    pq->arr[0] = pq->arr[pq->size - 1];
+    // Decrement the size of heap
+    pq->size--;
+ 
+    // Call minheapify_top_down for 0th index
+    // to maintain the heap property
+    minHeapify(pq, 0);
+    return deleteItem;
 }
 
-// void scheduler(queue* ready_queue) {
 
 
-// }
 
 int main(int argv, char**argc){
 
@@ -133,9 +185,9 @@ int main(int argv, char**argc){
     sig.sa_handler = my_handler;
     sigaction(SIGINT, &sig, NULL);
 
-    int fd = shm_open("shared memory", O_RDWR, 0666);
+    int fd = shm_open("sm2", O_RDWR, 0666);
 
-    queue* ready_queue = mmap(0, sizeof(queue), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    priority_queue* ready_queue = mmap(0, sizeof(priority_queue), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     close(fd);
     // scheduler(ready_queue);
 
@@ -143,19 +195,23 @@ int main(int argv, char**argc){
     int process_number=0;
 
     while(!end_print_history){
+        // printf("Yes\n");
         process running_array[NCPUs];
         int running_count = 0;
-        if(!isEmpty(ready_queue)){
+        // printf("%d\n",ready_queue->size);
+        if(ready_queue->size>0){
+            // printf("Yes\n");
             sem_wait(&ready_queue->mutex);
-            while(!isEmpty(ready_queue) && running_count<NCPUs){
+            while(ready_queue->size!=0 && running_count<NCPUs){
                 // printf("i - %d\n",running_count);
                 printf(" ");
-                running_array[running_count]=dequeue (ready_queue);
+                running_array[running_count]=extractMin(ready_queue);
                 // printf("in sched- %d\n",running_array[running_count]);
                 kill(running_array[running_count].pid, SIGCONT);
                 time_t starting_time;
                 time(&starting_time);
                 running_array[running_count].wait_time+= difftime(starting_time,running_array->prev_queued_time);
+                // printf("in the sched - %d\n",running_array[running_count].pid);
                 running_count++; 
             }
             sem_post(&ready_queue->mutex);
@@ -170,7 +226,7 @@ int main(int argv, char**argc){
                     // printf("YES\n");
                     kill(running_array[i].pid, SIGSTOP);
                     running_array[i].prev_queued_time=time(NULL);
-                    enqueue(ready_queue, running_array[i]);
+                    insert(ready_queue, running_array[i]);
                 }
                 else{
                     running_array[i].execution_time=time(NULL);
@@ -199,3 +255,9 @@ int main(int argv, char**argc){
 
     return 0;
 }
+
+
+
+// program priority
+// program 
+// program arguments priority
