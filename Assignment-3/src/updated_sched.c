@@ -206,7 +206,7 @@ while (!end_print_history) {
         sem_post(&ready_queue->mutex);
     }
     if (running_count > 0) {
-        sleep(TSLICE);
+        usleep(TSLICE*1000);
 
         // Handle running processes
         sem_wait(&ready_queue->mutex);
