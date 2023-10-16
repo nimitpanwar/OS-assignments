@@ -243,7 +243,7 @@ void shell_Loop(priority_queue* ready_queue) {
     char command[1024];
     char* arguments[1024];
     char cNCPU[3];
-    char cTSLICE[4];
+    char cTSLICE[16];
 
     // Fork a child process for the scheduler
     int sched_pid = fork();
