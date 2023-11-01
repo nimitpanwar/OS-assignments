@@ -93,6 +93,16 @@ void load_and_run_elf(char** exe) {
 
 }
 
+void loader_cleanup() {
+    if (phdr || ehdr) {
+        free(phdr);
+        free(ehdr);
+    }
+    if (fd != -1) {
+        close(fd);
+    }
+}
+
 int main(int argc, char** argv) 
 {
     if(argc != 2) { 
@@ -107,6 +117,8 @@ int main(int argc, char** argv)
     sigaction(SIGSEGV, &sig, NULL); // Set signal action for SIGSEGV
   
     load_and_run_elf(argv); 
+
+    loader_cleanup();
 
     // REPORT - Print page fault, total pages and total internal fragmentation
     printf("Page faults = %d\n",page_faults); 
