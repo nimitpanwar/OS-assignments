@@ -4,4 +4,4 @@ all:
 	./SimpleSmartLoader sum
 
 clean:
-	-@rm -f fib SimpleSmartLoader
+	-@rm -f sum SimpleSmartLoader
