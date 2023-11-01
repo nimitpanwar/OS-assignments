@@ -8,6 +8,7 @@ int page_faults=0; // Page fault counter
 int total_pages=0; // Total pages counter
 int bytes_lost=0; // Bytes lost counter
 
+
 // Signal handler for SIGSEGV
 static void my_handler(int signum, siginfo_t* si, void* vcontext) {
     if (signum == SIGSEGV) { 
@@ -17,22 +18,22 @@ static void my_handler(int signum, siginfo_t* si, void* vcontext) {
         for (size_t i = 0; i < ehdr->e_phnum; ++i) {
             if (segfault_address >= phdr[i].p_vaddr && segfault_address < phdr[i].p_vaddr + phdr[i].p_memsz) {
                 if(phdr[i].p_type!=PT_NULL){ 
-                    reqPhdr=&phdr[i]; // Set the requested program header
+                    reqPhdr=&phdr[i]; // Get the required program header
                     break;
                 }
             }
         }
         void* reqAddr =(void *)((uintptr_t)ehdr + (reqPhdr->p_offset)); // Requested address
 
-        size_t allocation_size=4096; // Allocation size = 4Kb
+        size_t allocation_size=4096; // Allocation size = 4KB(page size)
         int multiple=1; 
-
+        
         void *allocated_memory = mmap((void*)segfault_address,allocation_size,PROT_READ|PROT_WRITE|PROT_EXEC,MAP_ANONYMOUS|MAP_PRIVATE,0,0);
         if (allocated_memory == MAP_FAILED) { 
             perror("mmap");
             exit(1); 
         }
-        memcpy(allocated_memory,reqAddr,reqPhdr->p_filesz); // Copy the requested address to the allocated memory
+        memcpy(allocated_memory,reqAddr,4096); // Copy the requested address to the allocated memory
 
         page_faults++; // Increment page fault counter
         
@@ -100,10 +101,10 @@ int main(int argc, char** argv)
     }
                                                                                                          
     struct sigaction sig; 
-    memset(&sig, 0, sizeof(sig)); 
-    sig.sa_flags = SA_SIGINFO; 
+    memset(&sig, 0, sizeof(sig)); // Initialize signal action
+    sig.sa_flags = SA_SIGINFO; // Set signal action flags
     sig.sa_sigaction = my_handler; // Set signal action handler
-    sigaction(SIGSEGV, &sig, NULL); 
+    sigaction(SIGSEGV, &sig, NULL); // Set signal action for SIGSEGV
   
     load_and_run_elf(argv); 
 
