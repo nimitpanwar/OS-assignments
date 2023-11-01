@@ -100,10 +100,10 @@ int main(int argc, char** argv)
     }
                                                                                                          
     struct sigaction sig; 
-    memset(&sig, 0, sizeof(sig)); // Initialize signal action
-    sig.sa_flags = SA_SIGINFO; // Set signal action flags
+    memset(&sig, 0, sizeof(sig)); 
+    sig.sa_flags = SA_SIGINFO; 
     sig.sa_sigaction = my_handler; // Set signal action handler
-    sigaction(SIGSEGV, &sig, NULL); // Set signal action for SIGSEGV
+    sigaction(SIGSEGV, &sig, NULL); 
   
     load_and_run_elf(argv); 
 
