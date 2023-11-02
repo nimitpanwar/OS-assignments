@@ -7,11 +7,15 @@ int fd; // File descriptor
 int page_faults=0; // Page fault counter
 int total_pages=0; // Total pages counter
 int bytes_lost=0; // Bytes lost counter
+uintptr_t segfault_address_arr[128];
+int segfault_address_arr_size=0;
 
 
 // Signal handler for SIGSEGV
 static void my_handler(int signum, siginfo_t* si, void* vcontext) {
     if (signum == SIGSEGV) { 
+        segfault_address_arr[segfault_address_arr_size]=(uintptr_t) si->si_addr;;
+        segfault_address_arr_size++;
         uintptr_t segfault_address = (uintptr_t) si->si_addr; // Get the address that caused the segfault
         Elf32_Phdr *reqPhdr = NULL; // Requested program header
 
@@ -90,10 +94,13 @@ void load_and_run_elf(char** exe) {
     StartFunction _start = (StartFunction)((uintptr_t)ehdr->e_entry); 
     int result =_start(); 
     printf("_start return value = %d\n", result); 
-
+    
 }
 
 void loader_cleanup() {
+    for(int i=0;i<segfault_address_arr_size;i++){
+        munmap((void*)segfault_address_arr[i],4096);
+    }
     if (phdr || ehdr) {
         free(phdr);
         free(ehdr);
