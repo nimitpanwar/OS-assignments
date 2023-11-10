@@ -12,8 +12,6 @@ void demonstration(std::function<void()> && lambda) {
 }
 
 
-int count=0;
-
 void parallel_for(int low, int high, std::function<void(int)> &&lambda, int numThreads){
 
   struct timespec startTime, endTime;
@@ -31,7 +29,7 @@ void parallel_for(int low, int high, std::function<void(int)> &&lambda, int numT
   };
 
   for (int i = 0; i < numThreads; i++) {
-    thread_args* to_pass = new thread_args((i*chunk),((i+1)*chunk),lambda);
+    thread_args* to_pass = new thread_args((i*(high-low)/(numThreads))+low,((i+1)*(high-low)/(numThreads))+low,lambda);
     pthread_create(&tid[i], NULL, [](void* arg) -> void* {
         thread_args* curr_arg = (thread_args*)(arg);
         for (int j = curr_arg->low; j < curr_arg->high; j++) {
@@ -73,11 +71,8 @@ void parallel_for(int low1, int high1, int low2, int high2,std::function<void(in
     thread_args2(int low1, int high1, int low2, int high2, std::function<void(int,int)> lambdafn) : low1(low1), high1(high1), low2(low2), high2(high2), lambdafunc(lambdafn) {}
   };
 
-  int chunk1 = (high1- low1)/numThreads;
-  int chunk2=  (high2- low2)/numThreads;
-
   for(int i=0;i<numThreads;i++){
-    thread_args2* to_pass = new thread_args2((i*chunk1),(i+1)*chunk1,low2,high2,lambda);
+    thread_args2* to_pass = new thread_args2(i * (high1-low1) / numThreads , (i + 1) * (high1-low1) / numThreads ,low2,high2,lambda);
     pthread_create(&tid[i], NULL, [](void* arg) -> void*{ 
       thread_args2* curr_arg = (thread_args2*)(arg);
       for(int j=curr_arg->low1;j<curr_arg->high1;j++){
