@@ -17,22 +17,22 @@ void parallel_for(int low, int high, std::function<void(int)> &&lambda, int numT
     if (clock_gettime(CLOCK_MONOTONIC, &startTime) != 0) {
         perror("Failed to get start time");
     return;
-}
+  }
 
-// Calculate the chunk size for each thread
-int chunk = (high-low)/(numThreads);
-pthread_t tid[numThreads];
+  // Calculate the chunk size for each thread
+  int chunk = (high-low)/(numThreads);
+  pthread_t tid[numThreads];
 
-// Structure to hold arguments for each thread
-struct thread_args {
+  // Structure to hold arguments for each thread
+  struct thread_args {
     int low;
     int high;
     std::function<void(int)> lambdafunc;
     thread_args(int low, int high, std::function<void(int)> lambda) : low(low), high(high), lambdafunc(lambda) {}
   };
 
-// Creating Threads
-for (int i = 0; i < numThreads; i++) {
+  // Creating Threads
+  for (int i = 0; i < numThreads; i++) {
     // Allocate memory for thread arguments
     thread_args* to_pass = new thread_args((i*(high-low)/(numThreads))+low,((i+1)*(high-low)/(numThreads))+low,lambda);
     if (pthread_create(&tid[i], NULL, [](void* arg) -> void* {  // Create a new thread
@@ -48,18 +48,18 @@ for (int i = 0; i < numThreads; i++) {
       delete to_pass;
       return;
     }
-}
+  }
 
-// Wait for all threads to finish
-for (int i = 0; i < numThreads; i++) {
+  // Wait for all threads to finish
+  for (int i = 0; i < numThreads; i++) {
     if (pthread_join(tid[i], NULL) != 0) {
       perror("Failed to join thread");
       return;
     }
   }
 
-// Get the end time for calculation of execution time
-if (clock_gettime(CLOCK_MONOTONIC, &endTime) != 0) {
+  // Get the end time for calculation of execution time
+  if (clock_gettime(CLOCK_MONOTONIC, &endTime) != 0) {
     perror("Failed to get end time");
     return;
   }
@@ -69,22 +69,19 @@ if (clock_gettime(CLOCK_MONOTONIC, &endTime) != 0) {
   
 } 
 
-/*
-*
-* Similar to the above function, but for two ranges of integers.
-*
-*/
-
+//Similar to the above function, but for two ranges of integers.
 void parallel_for(int low1, int high1, int low2, int high2,std::function<void(int, int)> &&lambda, int numThreads){
 
+// Get the start time
 struct timespec startTime, endTime;
   if (clock_gettime(CLOCK_MONOTONIC, &startTime) != 0) {
     perror("Failed to get start time");
     return;
   }
 
-  pthread_t tid[numThreads];
+  pthread_t tid[numThreads]; // Array to hold thread IDs
 
+// Structure to hold arguments for each thread
   struct thread_args2 {
     int low1;
     int high1;
@@ -94,16 +91,20 @@ struct timespec startTime, endTime;
     thread_args2(int low1, int high1, int low2, int high2, std::function<void(int,int)> lambdafn) : low1(low1), high1(high1), low2(low2), high2(high2), lambdafunc(lambdafn) {}
   };
 
+  // Create threads
   for(int i=0;i<numThreads;i++){
+    // Allocate memory for thread arguments
     thread_args2* to_pass = new thread_args2(i * (high1-low1) / numThreads , (i + 1) * (high1-low1) / numThreads ,low2,high2,lambda);
+    // Create a new thread
     if (pthread_create(&tid[i], NULL, [](void* arg) -> void*{ 
       thread_args2* curr_arg = (thread_args2*)(arg);
+      // Execute the lambda function for the two ranges of integers
       for(int j=curr_arg->low1;j<curr_arg->high1;j++){
         for(int k=curr_arg->low2;k<curr_arg->high2;k++){
           curr_arg->lambdafunc(j,k);
         }
       }
-      delete curr_arg;
+      delete curr_arg; // Free the memory allocated for thread arguments
       return NULL;
     },(void*)to_pass) != 0) {
       perror("Failed to create thread");
@@ -111,7 +112,7 @@ struct timespec startTime, endTime;
       return;
     }
   }
-  
+  // Wait for all threads to finish
   for (int i = 0; i < numThreads; i++) {
     if (pthread_join(tid[i], NULL) != 0) {
       perror("Failed to join thread");
@@ -123,6 +124,7 @@ struct timespec startTime, endTime;
     perror("Failed to get end time");
     return;
   }
+  // Calculate and print the execution time
   double seconds = (endTime.tv_sec - startTime.tv_sec) + (endTime.tv_nsec - startTime.tv_nsec) / 1e9;
   printf("Execution Time: %f seconds\n", seconds);
 }
