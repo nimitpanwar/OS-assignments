@@ -10,6 +10,27 @@ int user_main(int argc, char **argv);
 void demonstration(std::function<void()> && lambda) {
   lambda();
 }
+
+// Structure to hold arguments for each thread
+struct thread_args1 {
+  int low;
+  int high;
+  std::function<void(int)> lambdafunc;
+  thread_args1(int low, int high, std::function<void(int)> lambda) : low(low), high(high), lambdafunc(lambda) {}
+};
+
+// Function to be called by each thread
+void* vec_thread_func(void* arg){
+  thread_args1* curr_arg = (thread_args1*)(arg);
+  // Execute the lambda function for the range of integers
+  for (int j = curr_arg->low; j < curr_arg->high; j++) {
+      curr_arg->lambdafunc(j);
+  }
+  delete curr_arg; // Free the memory allocated for thread arguments
+  return NULL;
+}
+
+
 // Function to execute a lambda function in parallel for a range of integers
 void parallel_for(int low, int high, std::function<void(int)> &&lambda, int numThreads){
     // Get the start time
@@ -23,27 +44,11 @@ void parallel_for(int low, int high, std::function<void(int)> &&lambda, int numT
   int chunk = (high-low)/(numThreads);
   pthread_t tid[numThreads];
 
-  // Structure to hold arguments for each thread
-  struct thread_args {
-    int low;
-    int high;
-    std::function<void(int)> lambdafunc;
-    thread_args(int low, int high, std::function<void(int)> lambda) : low(low), high(high), lambdafunc(lambda) {}
-  };
-
   // Creating Threads
   for (int i = 0; i < numThreads; i++) {
     // Allocate memory for thread arguments
-    thread_args* to_pass = new thread_args((i*(high-low)/(numThreads))+low,((i+1)*(high-low)/(numThreads))+low,lambda);
-    if (pthread_create(&tid[i], NULL, [](void* arg) -> void* {  // Create a new thread
-        thread_args* curr_arg = (thread_args*)(arg);
-        // Execute the lambda function for the range of integers
-        for (int j = curr_arg->low; j < curr_arg->high; j++) {
-            curr_arg->lambdafunc(j);
-        }
-        delete curr_arg; // Free the memory allocated for thread arguments
-        return NULL;
-    }, (void*)to_pass) != 0) {
+    thread_args1* to_pass = new thread_args1((i*(high-low)/(numThreads))+low,((i+1)*(high-low)/(numThreads))+low,lambda);
+    if (pthread_create(&tid[i], NULL, vec_thread_func, (void*)to_pass) != 0) {        //Create a new thread
       perror("Failed to create thread");
       delete to_pass;
       return;
@@ -69,6 +74,30 @@ void parallel_for(int low, int high, std::function<void(int)> &&lambda, int numT
   
 } 
 
+// Structure to hold arguments for each thread
+struct thread_args2 {
+  int low1;
+  int high1;
+  int low2;
+  int high2;
+  std::function<void(int,int)> lambdafunc;
+  thread_args2(int low1, int high1, int low2, int high2, std::function<void(int,int)> lambdafn) : low1(low1), high1(high1), low2(low2), high2(high2), lambdafunc(lambdafn) {}
+};
+
+
+// Function to be called by each thread
+void* matrix_thread_func(void* arg){
+  thread_args2* curr_arg = (thread_args2*)(arg);
+  // Execute the lambda function for the two ranges of integers
+  for(int j=curr_arg->low1;j<curr_arg->high1;j++){
+    for(int k=curr_arg->low2;k<curr_arg->high2;k++){
+      curr_arg->lambdafunc(j,k);
+    }
+  }
+  delete curr_arg; // Free the memory allocated for thread arguments
+  return NULL;
+}
+
 //Similar to the above function, but for two ranges of integers.
 void parallel_for(int low1, int high1, int low2, int high2,std::function<void(int, int)> &&lambda, int numThreads){
 
@@ -81,32 +110,12 @@ struct timespec startTime, endTime;
 
   pthread_t tid[numThreads]; // Array to hold thread IDs
 
-// Structure to hold arguments for each thread
-  struct thread_args2 {
-    int low1;
-    int high1;
-    int low2;
-    int high2;
-    std::function<void(int,int)> lambdafunc;
-    thread_args2(int low1, int high1, int low2, int high2, std::function<void(int,int)> lambdafn) : low1(low1), high1(high1), low2(low2), high2(high2), lambdafunc(lambdafn) {}
-  };
-
   // Create threads
   for(int i=0;i<numThreads;i++){
     // Allocate memory for thread arguments
     thread_args2* to_pass = new thread_args2(i * (high1-low1) / numThreads , (i + 1) * (high1-low1) / numThreads ,low2,high2,lambda);
     // Create a new thread
-    if (pthread_create(&tid[i], NULL, [](void* arg) -> void*{ 
-      thread_args2* curr_arg = (thread_args2*)(arg);
-      // Execute the lambda function for the two ranges of integers
-      for(int j=curr_arg->low1;j<curr_arg->high1;j++){
-        for(int k=curr_arg->low2;k<curr_arg->high2;k++){
-          curr_arg->lambdafunc(j,k);
-        }
-      }
-      delete curr_arg; // Free the memory allocated for thread arguments
-      return NULL;
-    },(void*)to_pass) != 0) {
+    if (pthread_create(&tid[i], NULL,matrix_thread_func,(void*)to_pass) != 0) {
       perror("Failed to create thread");
       delete to_pass;
       return;
